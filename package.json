@@ -1,0 +1,35 @@
+{
+  "name": "@geovation/gb-name-index",
+  "version": "0.1.0",
+  "description": "Tiny client for the Great Britain name prefix index.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "browser": "./dist/index.global.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
+    },
+    "./browser": "./dist/index.global.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "vite web --config web/vite.config.js --host 127.0.0.1",
+    "check-pages-size": "node scripts/check-pages-size.mjs build/data/names",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "esbuild": "^0.28.2",
+    "svelte": "^5.57.0",
+    "vite": "^8.2.2"
+  },
+  "dependencies": {
+    "@lucide/svelte": "^1.43.0"
+  }
+}

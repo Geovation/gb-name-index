@@ -141,3 +141,19 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Local Python environments and caches
+.venv/
+.venv-build/
+__pycache__/
+*.py[cod]
+
+# Local OS Open Names cache
+.os-open-names-cache/
+
+# Generated index build output
+build/
+
+# JavaScript package dependencies and bundles
+node_modules/
+dist/
