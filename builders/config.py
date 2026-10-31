@@ -20,17 +20,94 @@ COORDINATE_DECIMAL_PLACES = 5
 RECORD_FIELDS = ("NAME1", "TYPE", "LOCAL_TYPE", "LOCALITY", "POSTCODE_DISTRICT", "REGION", "LONGITUDE", "LATITUDE", "SOURCE")
 SOURCES = ("OS Open Names", "Overture Places")
 
-# Type labels for OS Open Names
-OS_OPEN_NAMES_TYPE_LABELS = {
-    "hydrography": "Water features",
-    "landcover": "Land cover",
-    "landform": "Landforms",
-    "other": "Other named features",
-    "populatedPlace": "Settlements and localities",
-    "transportNetwork": "Roads, postcodes and transport",
+# Catalog of every category each source can contribute.
+# This is the pick-and-mix list: the caller chooses which categories to include,
+# while the default values below establish the shipping defaults.
+SOURCE_TYPE_CATALOG = {
+    "OS Open Names": {
+        "hydrography": "Water features",
+        "landcover": "Land cover",
+        "landform": "Landforms",
+        "other": "Other named features",
+        "populatedPlace": "Settlements and localities",
+        "postcode": "Postcodes",
+        "transportNetwork": "Roads and transport",
+    },
+    "Overture Places": {
+        "airport": "Airport",
+        "beach": "Beach",
+        "bridge": "Bridge",
+        "canal": "Canal",
+        "castle": "Castle",
+        "cemetery": "Cemetery",
+        "forest": "Forest",
+        "garden": "Garden",
+        "historic_site": "Historic site",
+        "island": "Island",
+        "lake": "Lake",
+        "land_feature": "Land feature",
+        "marina": "Marina",
+        "monument": "Monument",
+        "mountain": "Mountain",
+        "national_park": "National park",
+        "nature_reserve": "Nature reserve",
+        "park": "Park",
+        "pier": "Pier",
+        "public_fountain": "Public fountain",
+        "public_plaza": "Public plaza",
+        "rail_facility_or_service": "Rail facility or service",
+        "recreational_trail_or_path": "Recreational trail or path",
+        "river": "River",
+        "train_station": "Train station",
+        "waterfall": "Waterfall",
+    },
 }
 
-# Overture categories that overlap with OS Open Names (to exclude from Overture)
+# Defaults for the shipping build. Set a value to False to exclude a category
+# even when it is available from the source.
+SOURCE_TYPE_DEFAULTS = {
+    "OS Open Names": {
+        "hydrography": True,
+        "landcover": True,
+        "landform": True,
+        "other": True,
+        "populatedPlace": True,
+        "postcode": True,
+        "transportNetwork": True,
+    },
+    "Overture Places": {
+        "airport": True,
+        "beach": True,
+        "bridge": True,
+        "canal": True,
+        "castle": True,
+        "cemetery": True,
+        "forest": True,
+        "garden": True,
+        "historic_site": True,
+        "island": True,
+        "lake": True,
+        "land_feature": True,
+        "marina": True,
+        "monument": True,
+        "mountain": True,
+        "national_park": True,
+        "nature_reserve": True,
+        "park": True,
+        "pier": True,
+        "public_fountain": True,
+        "public_plaza": True,
+        "rail_facility_or_service": True,
+        "recreational_trail_or_path": True,
+        "river": True,
+        "train_station": True,
+        "waterfall": True,
+    },
+}
+
+# Separate policy for source overlap: these are categories that are already
+# supplied by OS Open Names and should be excluded from Overture even when the
+# Overture type is otherwise enabled by the defaults.
 OVERTURE_OVERLAP_CATEGORIES = {
     "air_transport_facility_or_service",
     "airport",

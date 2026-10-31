@@ -1,4 +1,4 @@
-const defaultBaseUrl = 'https://geovation.github.io/gb-name-index/data/names'
+const defaultBaseUrl = 'https://geovation.github.io/gb-name-index/data'
 
 /**
  * Normalizes a search term or name for case-insensitive prefix matching.
@@ -18,7 +18,7 @@ export function normalize (query) {
  * @param {string[]} [values=[]] - Values ordered from highest to lowest priority.
  * @returns {Map<string, number>} Value-to-priority mapping.
  */
-function priorityMap (values = []) {
+function buildPriorityMap (values = []) {
   return new Map(values.map((value, index) => [value, index]))
 }
 
@@ -29,7 +29,7 @@ function priorityMap (values = []) {
  * @param {Map<string, number>} priorities - Value-to-priority mapping.
  * @returns {number} Numeric priority for sorting.
  */
-function priorityOf (value, priorities) {
+function getPriorityRank (value, priorities) {
   return priorities.get(value) ?? priorities.size
 }
 
@@ -41,7 +41,7 @@ function priorityOf (value, priorities) {
  * @param {Map<string, number>} typePriorities - Type ranking map.
  * @returns {(left: Record<string, unknown>, right: Record<string, unknown>) => number} Record comparator.
  */
-function compareRecords (query, sourcePriorities, typePriorities) {
+function compareRecordsByPriority (query, sourcePriorities, typePriorities) {
   const normalizedQuery = normalize(query)
   return (left, right) => {
     const exactNameDifference =
@@ -50,13 +50,13 @@ function compareRecords (query, sourcePriorities, typePriorities) {
     if (exactNameDifference) return exactNameDifference
 
     const sourceDifference =
-      priorityOf(left.SOURCE, sourcePriorities) -
-      priorityOf(right.SOURCE, sourcePriorities)
+      getPriorityRank(left.SOURCE, sourcePriorities) -
+      getPriorityRank(right.SOURCE, sourcePriorities)
     if (sourceDifference) return sourceDifference
 
     const typeDifference =
-      priorityOf(left.TYPE, typePriorities) -
-      priorityOf(right.TYPE, typePriorities)
+      getPriorityRank(left.TYPE, typePriorities) -
+      getPriorityRank(right.TYPE, typePriorities)
     if (typeDifference) return typeDifference
 
     return ['NAME1', 'LOCALITY', 'REGION', 'TYPE', 'SOURCE'].reduce(
@@ -69,7 +69,7 @@ function compareRecords (query, sourcePriorities, typePriorities) {
 }
 
 /**
- * Creates a client for the static Great Britain name prefix index.
+ * Creates a client for the static GB name prefix index.
  *
  * @param {object} [options={}] - Client configuration.
  * @param {string} [options.baseUrl] - URL of the directory containing index shards.
@@ -91,8 +91,8 @@ export function createNameIndex ({
 
   const cache = new Map()
   const base = baseUrl.replace(/\/+$/, '')
-  const defaultSourcePriorities = priorityMap(sourcePriority)
-  const defaultTypePriorities = priorityMap(typePriority)
+  const defaultSourcePriorities = buildPriorityMap(sourcePriority)
+  const defaultTypePriorities = buildPriorityMap(typePriority)
   let manifestRequest
 
   /**
@@ -124,7 +124,7 @@ export function createNameIndex ({
    * @param {AbortSignal} [signal] - Signal used to cancel the initial request.
    * @returns {Promise<unknown[][]>} Encoded record rows, or an empty array for a missing shard.
    */
-  async function load (prefix, signal) {
+  async function loadShard (prefix, signal) {
     if (!cache.has(prefix)) {
       const request = fetcher(`${base}/${encodeURIComponent(prefix)}.json`, {
         signal
@@ -153,7 +153,7 @@ export function createNameIndex ({
    * @param {{schema: string[], sources: string[]}} manifest - Index manifest.
    * @returns {Record<string, unknown>} Decoded record without empty fields.
    */
-  function decode (row, manifest) {
+  function decodeRecord (row, manifest) {
     return Object.fromEntries(
       manifest.schema
         .map((field, index) => [
@@ -178,7 +178,7 @@ export function createNameIndex ({
    * @param {Record<string, unknown>} manifest - Index manifest.
    * @returns {{kind: 'none'} | {kind: 'leaf', shard: string} | {kind: 'preview', node: string}} Search plan.
    */
-  function planFor (prefix, manifest) {
+  function planSearchRoute (prefix, manifest) {
     const minimumLength =
       manifest.minimumQueryLength ?? manifest.shardLength ?? 3
     if (prefix.length < minimumLength) return { kind: 'none' }
@@ -205,7 +205,7 @@ export function createNameIndex ({
    * @param {AbortSignal} [signal] - Signal used to cancel shard requests.
    * @returns {Promise<{rows: unknown[][], moreAvailable: boolean}>} Preview rows and availability marker.
    */
-  async function gatherPreview (node, manifest, previewLimit, signal) {
+  async function collectPreviewRows (node, manifest, previewLimit, signal) {
     const routes = manifest.routes ?? {}
     const queue = [...routes[node]].sort().map(character => node + character)
     const rows = []
@@ -219,7 +219,7 @@ export function createNameIndex ({
         )
         continue
       }
-      rows.push(...(await load(candidate, signal)))
+      rows.push(...(await loadShard(candidate, signal)))
     }
     return { rows, moreAvailable: queue.length > 0 }
   }
@@ -251,14 +251,14 @@ export function createNameIndex ({
     ) {
       const prefix = normalize(query)
       const manifest = await loadManifest(signal)
-      const plan = planFor(prefix, manifest)
+      const plan = planSearchRoute(prefix, manifest)
       let rows = []
       let moreAvailable = false
       if (plan.kind === 'leaf') {
-        rows = await load(plan.shard, signal)
+        rows = await loadShard(plan.shard, signal)
         moreAvailable = Object.hasOwn(manifest.truncated ?? {}, plan.shard)
       } else if (plan.kind === 'preview') {
-        ;({ rows, moreAvailable } = await gatherPreview(
+        ;({ rows, moreAvailable } = await collectPreviewRows(
           plan.node,
           manifest,
           previewLimit,
@@ -270,22 +270,22 @@ export function createNameIndex ({
       const sourcePriorities =
         searchSourcePriority === sourcePriority
           ? defaultSourcePriorities
-          : priorityMap(searchSourcePriority)
+          : buildPriorityMap(searchSourcePriority)
       const typePriorities =
         searchTypePriority === typePriority
           ? defaultTypePriorities
-          : priorityMap(searchTypePriority)
+          : buildPriorityMap(searchTypePriority)
       const sourceFilter = sources === undefined ? undefined : new Set(sources)
       const typeFilter = types === undefined ? undefined : new Set(types)
       const results = rows
-        .map(row => decode(row, manifest))
+        .map(row => decodeRecord(row, manifest))
         .filter(
           record =>
             normalize(record.NAME1).startsWith(prefix) &&
             (!sourceFilter || sourceFilter.has(record.SOURCE)) &&
             (!typeFilter || typeFilter.has(record.TYPE))
         )
-        .sort(compareRecords(query, sourcePriorities, typePriorities))
+        .sort(compareRecordsByPriority(query, sourcePriorities, typePriorities))
       return Object.assign(results, { moreAvailable })
     },
     /**

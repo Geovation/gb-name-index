@@ -20,7 +20,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "vite web --config web/vite.config.js --host 127.0.0.1",
-    "check-pages-size": "node scripts/check-pages-size.mjs build/data/names",
+    "check-pages-size": "node scripts/check-pages-size.mjs build/data",
     "prepack": "npm run build"
   },
   "devDependencies": {

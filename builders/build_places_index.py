@@ -11,20 +11,73 @@ from pathlib import Path
 
 from .build_os_open_names_index import build, read_names, release_from_redirect
 from .build_overture_places_index import latest_release, place_assets, read_places
-from .config import GB_NAME_INDEX_PRODUCT_NAME, OS_OPEN_NAMES_DOWNLOAD_URL, OVERTURE_OVERLAP_CATEGORIES, OVERTURE_STAC_CATALOG
+from .config import (
+    GB_NAME_INDEX_PRODUCT_NAME,
+    OS_OPEN_NAMES_DOWNLOAD_URL,
+    OVERTURE_OVERLAP_CATEGORIES,
+    OVERTURE_STAC_CATALOG,
+    SOURCE_TYPE_CATALOG,
+    SOURCE_TYPE_DEFAULTS,
+)
 
 
-def selected_os_records(records: list[dict[str, object]]) -> list[dict[str, object]]:
+def include_record_type(
+    source: str,
+    type_name: object,
+    included_types: set[str] | None = None,
+    excluded_types: set[str] | None = None,
+) -> bool:
+    """Return whether a source-specific category is enabled by the catalog defaults."""
+    if type_name is None:
+        return True
+    type_key = str(type_name)
+    catalog = SOURCE_TYPE_CATALOG.get(source, {})
+    if type_key not in catalog:
+        return False
+    if excluded_types and type_key in excluded_types:
+        return False
+    if included_types and type_key in included_types:
+        return True
+    defaults = SOURCE_TYPE_DEFAULTS.get(source, {})
+    allowed = defaults.get(type_key, True)
+    if source == "Overture Places" and type_key in OVERTURE_OVERLAP_CATEGORIES:
+        return False and allowed
+    return allowed
+
+
+def selected_os_records(
+    records: list[dict[str, object]],
+    included_types: set[str] | None = None,
+    excluded_types: set[str] | None = None,
+) -> list[dict[str, object]]:
     """Tag OS Open Names records with their source for the unified index."""
-    return [{**record, "SOURCE": "OS Open Names"} for record in records]
+    return [
+        {**record, "SOURCE": "OS Open Names"}
+        for record in records
+        if include_record_type(
+            "OS Open Names",
+            record.get("TYPE"),
+            included_types=included_types,
+            excluded_types=excluded_types,
+        )
+    ]
 
 
-def selected_overture_records(records: list[dict[str, object]]) -> list[dict[str, object]]:
-    """Tag and retain Overture records that do not overlap OS Open Names coverage."""
+def selected_overture_records(
+    records: list[dict[str, object]],
+    included_types: set[str] | None = None,
+    excluded_types: set[str] | None = None,
+) -> list[dict[str, object]]:
+    """Tag and retain Overture records that are enabled and not overlapping OS coverage."""
     return [
         {**record, "SOURCE": "Overture Places"}
         for record in records
-        if record.get("TYPE") not in OVERTURE_OVERLAP_CATEGORIES
+        if include_record_type(
+            "Overture Places",
+            record.get("TYPE"),
+            included_types=included_types,
+            excluded_types=excluded_types,
+        )
     ]
 
 
@@ -40,7 +93,35 @@ def main() -> int:
     parser.add_argument("--memory-limit", default="1GB")
     parser.add_argument("--max-os-records", type=int, help="Optional OS Open Names limit for a small test build")
     parser.add_argument("--max-overture-records", type=int, help="Optional Overture Places limit for a small test build")
-    parser.add_argument("--output", type=Path, default=Path(__file__).parent.parent / "build" / "data" / "names")
+    parser.add_argument(
+        "--include-os-type",
+        action="append",
+        default=[],
+        choices=sorted(SOURCE_TYPE_CATALOG["OS Open Names"]),
+        help="OS Open Names category to include; may be specified multiple times",
+    )
+    parser.add_argument(
+        "--exclude-os-type",
+        action="append",
+        default=[],
+        choices=sorted(SOURCE_TYPE_CATALOG["OS Open Names"]),
+        help="OS Open Names category to exclude; may be specified multiple times",
+    )
+    parser.add_argument(
+        "--include-overture-type",
+        action="append",
+        default=[],
+        choices=sorted(SOURCE_TYPE_CATALOG["Overture Places"]),
+        help="Overture category to include; may be specified multiple times",
+    )
+    parser.add_argument(
+        "--exclude-overture-type",
+        action="append",
+        default=[],
+        choices=sorted(SOURCE_TYPE_CATALOG["Overture Places"]),
+        help="Overture category to exclude; may be specified multiple times",
+    )
+    parser.add_argument("--output", type=Path, default=Path(__file__).parent.parent / "build" / "data")
     args = parser.parse_args()
     if not 0 <= args.minimum_confidence <= 1:
         parser.error("--minimum-confidence must be between 0 and 1")
@@ -66,7 +147,16 @@ def main() -> int:
 
     overture_release = args.overture_release or latest_release(args.overture_stac_catalog)
     overture_source = args.overture_input or place_assets(overture_release)
-    os_records = selected_os_records(read_names(archive, args.max_os_records))
+    os_included_types = set(args.include_os_type)
+    os_excluded_types = set(args.exclude_os_type)
+    overture_included_types = set(args.include_overture_type)
+    overture_excluded_types = set(args.exclude_overture_type)
+
+    os_records = selected_os_records(
+        read_names(archive, args.max_os_records),
+        included_types=os_included_types,
+        excluded_types=os_excluded_types,
+    )
     overture_records = selected_overture_records(
         read_places(
             overture_source,
@@ -75,7 +165,9 @@ def main() -> int:
             args.minimum_confidence,
             args.max_overture_records,
             args.memory_limit,
-        )
+        ),
+        included_types=overture_included_types,
+        excluded_types=overture_excluded_types,
     )
     records = os_records + overture_records
     releases = f"OS Open Names {os_release}; Overture Places {overture_release}"

@@ -11,7 +11,7 @@
   import { toggle, move, resultMeta } from "./lib/utils.js";
 
   const index = createNameIndex({
-    baseUrl: new URL("data/names", window.location.href).href,
+    baseUrl: new URL("data", window.location.href).href,
     sourcePriority: ["OS Open Names", "Overture Places"],
   });
 

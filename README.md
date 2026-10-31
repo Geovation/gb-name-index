@@ -8,7 +8,7 @@ The generated index is published to the `gh-pages` branch of this repository. Ge
 
 This repository consists of the following key components:
 
-- **Build scripts** (`build_places_index.py`, `build_os_open_names_index.py`, `build_overture_places_index.py`) - Python scripts that download and combine OS Open Names and Overture Places data into prefix-sharded JSON indexes stored in `build/data/names/`
+- **Build scripts** (`build_places_index.py`, `build_os_open_names_index.py`, `build_overture_places_index.py`) - Python scripts that download and combine OS Open Names and Overture Places data into prefix-sharded JSON indexes stored in `build/data/`
 
 - **JavaScript client** (`src/index.js`) - A lightweight, reusable JavaScript module that provides a `search()` function for querying the index with support for source and type filtering and prioritization
 
@@ -16,7 +16,7 @@ This repository consists of the following key components:
 
 - **Build utilities** (`scripts/`) - Node.js utilities for building and validating the project, including page size checks
 
-- **Generated data** (`build/data/names/`) - The output of the build scripts: prefix-sharded JSON files containing indexed place names
+- **Generated data** (`build/data/`) - The output of the build scripts: prefix-sharded JSON files containing indexed place names
 
 ## Getting Started
 
@@ -53,7 +53,7 @@ Build the combined index:
 .venv/bin/python builders/build_places_index.py
 ```
 
-The generated files are written to `build/data/names/`. The OS archive and release marker are cached in `.os-open-names-cache/`.
+The generated files are written to `build/data/`. The OS archive and release marker are cached in `.os-open-names-cache/`.
 
 For a smaller local test build, use `--max-os-records` and `--max-overture-records`:
 
@@ -64,6 +64,63 @@ For a smaller local test build, use `--max-os-records` and `--max-overture-recor
 ```
 
 The build also supports `--os-download-url`, `--overture-release`, `--overture-input`, `--minimum-confidence`, `--memory-limit`, and `--output` to override its default sources and output location.
+
+## Category Catalog and Pick-and-Mix Defaults
+
+The index is built from an explicit catalog of categories available from each source. This is defined in `builders/config.py` as `SOURCE_TYPE_CATALOG` and `SOURCE_TYPE_DEFAULTS`. The `postcode` category refers to actual postcode records from the source, while `POSTCODE_DISTRICT` remains a separate context field for district-style values.
+
+The catalog is the master list of what each source can contribute, and the defaults decide what ships by default. You can override either one at build time using the CLI flags below:
+
+```bash
+.venv/bin/python builders/build_places_index.py \
+  --include-os-type postcode \
+  --exclude-os-type other \
+  --include-overture-type park \
+  --exclude-overture-type airport
+```
+
+This is the pick-and-mix model: every category is listed up front, defaults are defined centrally, and the CLI lets you include or exclude specific categories without editing the source code. The source overlap list is still kept separate as a deduplication policy for Overture layers that are already represented by OS Open Names.
+
+### Available OS Open Names categories
+
+- `hydrography`
+- `landcover`
+- `landform`
+- `other`
+- `populatedPlace`
+- `postcode`
+- `transportNetwork`
+
+### Available Overture categories
+
+- `airport`
+- `beach`
+- `bridge`
+- `canal`
+- `castle`
+- `cemetery`
+- `forest`
+- `garden`
+- `historic_site`
+- `island`
+- `lake`
+- `land_feature`
+- `marina`
+- `monument`
+- `mountain`
+- `national_park`
+- `nature_reserve`
+- `park`
+- `pier`
+- `public_fountain`
+- `public_plaza`
+- `rail_facility_or_service`
+- `recreational_trail_or_path`
+- `river`
+- `train_station`
+- `waterfall`
+
+When both an include and exclude override are supplied for the same category, the explicit exclusion wins.
 
 ## Using the JavaScript Client
 
@@ -87,7 +144,7 @@ For an alternative deployment, configure the index base URL:
 import { createNameIndex } from "@geovation/gb-name-index";
 
 const names = createNameIndex({
-	baseUrl: "https://example.com/data/names"
+	baseUrl: "https://example.com/data"
 });
 const results = await names.search("Baker Street");
 ```
@@ -123,19 +180,19 @@ CommonJS consumers can use `require("@geovation/gb-name-index")`. The browser-gl
 `index.json` records the source releases, compact record schema, and adaptive shard layout. The index starts with three-character prefixes, preserving those shards when they are small and splitting only high-volume prefixes until each ordinary shard is at most 64 KiB:
 
 ```text
-https://<owner>.github.io/<repository>/data/names/<shard>.json
+https://<owner>.github.io/<repository>/data/<shard>.json
 ```
 
 Names are case-folded and stripped of non-alphanumeric characters before sharding. For example, a small `Baker` group can be stored in `bak.json`, while a high-volume `St John's` group may be split to a longer leaf prefix. The client follows manifest routing metadata and filters the leaf shard for the complete query. Unsplittable exact-name groups are capped at 50 records so autocomplete responses remain bounded.
 
-The manifest schema is `NAME1`, `TYPE`, `LOCAL_TYPE`, `LOCALITY`, `POSTCODE_DISTRICT`, `REGION`, `LONGITUDE`, `LATITUDE`, and `SOURCE`. `TYPE` is the broad, filterable classification; `LOCAL_TYPE` preserves a more specific source subtype when available, such as `Named Road`. `LOCALITY` and `POSTCODE_DISTRICT` are populated from each source where available, providing human-readable road disambiguation. Coordinates use WGS 84 and are rounded to the manifest's `coordinatePrecision` value, currently five decimal places. Its `sources` and `types` arrays enumerate filter choices. `typesBySource` groups raw type identifiers by dataset, while `typeLabelsBySource` supplies source-aware labels for user interfaces.
+The manifest schema is `NAME1`, `TYPE`, `LOCAL_TYPE`, `LOCALITY`, `POSTCODE_DISTRICT`, `REGION`, `LONGITUDE`, `LATITUDE`, and `SOURCE`. `TYPE` is the broad, filterable classification; `LOCAL_TYPE` preserves a more specific source subtype when available, such as `Named Road`. `LOCALITY` and `POSTCODE_DISTRICT` are populated from each source where available and are treated as separate contextual fields rather than being folded into the generic `transportNetwork` bucket. Coordinates use WGS 84 and are rounded to the manifest's `coordinatePrecision` value, currently five decimal places. Its `sources` and `types` arrays enumerate filter choices. `typesBySource` groups raw type identifiers by dataset, while `typeLabelsBySource` supplies source-aware labels for user interfaces.
 
 ### Using Shards Directly
 
 Use the JavaScript client above when possible. To consume the static files from scratch, load `index.json` once, normalize the query, and follow `routes` until reaching a leaf shard. A route value is the set of available next characters. `_` represents the end of a normalized name, such as an exact `InPost` query.
 
 ```js
-const baseUrl = "https://<owner>.github.io/<repository>/data/names";
+const baseUrl = "https://<owner>.github.io/<repository>/data";
 
 function normalize(value) {
 	return String(value).toLowerCase().replace(/[^a-z0-9]/g, "");
