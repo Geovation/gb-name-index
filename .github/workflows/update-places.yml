@@ -80,6 +80,8 @@ jobs:
         with:
           source: build/pages-source
           destination: build/pages-site
+      - name: Return Jekyll output to the runner
+        run: sudo chown -R "$(id -u):$(id -g)" build/pages-site
       - name: Add generated index, harness, and client
         run: |
           mkdir -p build/pages-site/data build/pages-site/client build/pages-site/harness build/pages-site/assets

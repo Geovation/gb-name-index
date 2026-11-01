@@ -40,6 +40,7 @@ test('Jekyll source uses GitHub Pages plugins for README and Markdown links', as
   assert.match(workflow, /web\/docs\.css web\/jekyll-mermaid\.js/)
   assert.match(workflow, /cp ATTRIBUTION\.md build\/pages-source\/_includes\/attribution\.md/)
   assert.match(workflow, /cp LICENSE build\/pages-source\/_includes\/license\.md/)
+  assert.match(workflow, /sudo chown -R "\$\(id -u\):\$\(id -g\)" build\/pages-site/)
   assert.match(workflow, /actions\/deploy-pages@v4/)
 
   const attributionPage = await readFile('docs/attribution.md', 'utf8')
