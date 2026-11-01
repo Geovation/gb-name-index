@@ -1,5 +1,5 @@
 ---
-layout: page
+layout: default
 title: Data builders
 ---
 
@@ -21,15 +21,15 @@ The builder discovers the current OS release and Overture release, reads records
 %% caption: Both datasets pass through source-specific filters before becoming compact, routed JSON files.
 flowchart TD
   subgraph Sources[Source data]
-    OS["OS Open Names CSV"] --> OSRead["Read names<br/>convert British National Grid coordinates"]
-    Overture["Overture Places GeoParquet"] --> OvertureRead["Keep named GB places<br/>apply confidence threshold"]
+    OS["OS Open Names CSV"] -->|CSV rows| OSRead["Read names<br/>convert British National Grid coordinates"]
+    Overture["Overture Places GeoParquet"] -->|place records| OvertureRead["Keep named GB places<br/>apply confidence threshold"]
   end
-  OSRead --> Select["Apply OS category rules<br/>remove overlapping Overture categories"]
-  OvertureRead --> Select
-  Select --> Normalize["Normalize names<br/>round coordinates<br/>assign source and category labels"]
-  Normalize --> Encode["Encode rows in manifest field order"]
-  Encode --> Shard["Split oversized prefixes<br/>cap unsplittable exact-name groups"]
-  Shard --> Output["build/data/<br/>manifest, routes, and leaf shards"]
+  OSRead -->|eligible OS records| Select["Apply category rules<br/>remove configured overlaps"]
+  OvertureRead -->|named GB places above threshold| Select
+  Select -->|selected records from both sources| Normalize["Normalize names<br/>round coordinates<br/>assign source and category labels"]
+  Normalize -->|shared fields and search keys| Encode["Encode rows in manifest field order"]
+  Encode -->|compact field arrays| Shard["Split oversized prefixes<br/>cap unsplittable exact-name groups"]
+  Shard -->|manifest, routes, and bounded shards| Output["build/data/<br/>published index files"]
 ```
 
 ## The shared index structure

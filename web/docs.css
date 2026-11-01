@@ -1,10 +1,10 @@
 .diagram {
   overflow-x: auto;
   margin: 24px 0;
-  border: 1px solid #d7dbe2;
-  border-radius: 4px;
+  border: 1px solid #c4d2e5;
+  border-radius: 6px;
   background: #ffffff;
-  padding: 20px;
+  padding: 16px;
 }
 
 .mermaid {
@@ -12,10 +12,31 @@
   text-align: center;
 }
 
+.mermaid svg {
+  display: block;
+  width: 100%;
+  min-width: 720px;
+  max-width: none;
+  height: auto;
+  margin: 0 auto;
+}
+
 .diagram figcaption {
-  border-top: 1px solid #e1e4ea;
-  color: #596374;
+  border-top: 1px solid #c4d2e5;
+  color: #31445f;
   font-size: 0.875rem;
   line-height: 1.5;
-  padding: 11px 16px;
+  padding: 12px 16px;
+}
+
+.diagram figcaption::before {
+  content: "Diagram: ";
+  color: #2859d6;
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  .diagram {
+    padding: 10px;
+  }
 }

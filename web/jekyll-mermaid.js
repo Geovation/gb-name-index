@@ -26,6 +26,33 @@ for (const block of blocks) {
 
 if (blocks.length) {
   const { default: mermaid } = await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs')
-  mermaid.initialize({ startOnLoad: false, theme: 'neutral' })
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'base',
+    themeVariables: {
+      background: '#ffffff',
+      primaryColor: '#e8f1ff',
+      primaryTextColor: '#172b4d',
+      primaryBorderColor: '#4669a8',
+      lineColor: '#52637a',
+      secondaryColor: '#e5f5ee',
+      tertiaryColor: '#fff1d6',
+      clusterBkg: '#f0f5fb',
+      clusterBorder: '#bfccdf',
+      edgeLabelBackground: '#ffffff',
+      actorBkg: '#e8f1ff',
+      actorBorder: '#4669a8',
+      actorTextColor: '#172b4d',
+      actorLineColor: '#52637a',
+      signalColor: '#52637a',
+      signalTextColor: '#172b4d',
+      labelBoxBkgColor: '#fff1d6',
+      labelBoxBorderColor: '#d99a2b',
+      labelTextColor: '#172b4d',
+      loopTextColor: '#172b4d'
+    },
+    flowchart: { curve: 'linear', nodeSpacing: 40, rankSpacing: 55 },
+    sequence: { actorMargin: 40, messageMargin: 30 }
+  })
   await mermaid.run({ querySelector: '.mermaid' })
 }

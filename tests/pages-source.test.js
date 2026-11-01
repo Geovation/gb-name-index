@@ -36,6 +36,12 @@ test('Jekyll source uses GitHub Pages plugins for README and Markdown links', as
   assert.match(head, /jekyll-mermaid\.js/)
   assert.match(head, /docs\.css/)
 
+  const mermaidScript = await readFile('web/jekyll-mermaid.js', 'utf8')
+  assert.match(mermaidScript, /theme: 'base'/)
+  assert.doesNotMatch(mermaidScript, /theme: 'neutral'/)
+  const diagramStyles = await readFile('web/docs.css', 'utf8')
+  assert.match(diagramStyles, /\.mermaid svg\s*\{[^}]*min-width:\s*720px/s)
+
   const workflow = await readFile('.github/workflows/update-places.yml', 'utf8')
   assert.match(workflow, /actions\/jekyll-build-pages@v1/)
   assert.match(workflow, /web\/docs\.css web\/jekyll-mermaid\.js/)
@@ -66,9 +72,9 @@ test('Jekyll source uses GitHub Pages plugins for README and Markdown links', as
 
   for (const [path, title] of pages) {
     const markdown = await readFile(path, 'utf8')
-    const frontMatter = markdown.match(/^---\nlayout: page\ntitle: .+\n---$/gm) ?? []
+    const frontMatter = markdown.match(/^---\nlayout: default\ntitle: .+\n---$/gm) ?? []
     assert.equal(frontMatter.length, 1, `${path} should have exactly one front-matter block`)
-    assert.match(markdown, new RegExp(`^---\\nlayout: page\\ntitle: ${title.replace(/[.*+?^${}()|[\\]\\]/g, '\\\\$&')}\\n---`, 'm'))
+    assert.match(markdown, new RegExp(`^---\\nlayout: default\\ntitle: ${title.replace(/[.*+?^${}()|[\\]\\]/g, '\\\\$&')}\\n---`, 'm'))
   }
 })
 
@@ -79,6 +85,11 @@ test('every Mermaid diagram declares a caption', async () => {
     const markdown = await readFile(path, 'utf8')
     for (const [, body] of markdown.matchAll(/```mermaid\s*\n([\s\S]*?)```/g)) {
       assert.match(body.split(/\r?\n/, 1)[0], /^%% caption:\s*.+/)
+      if (/^\s*(?:flowchart|graph)\b/m.test(body)) {
+        const edges = body.match(/-->/g) ?? []
+        const annotatedEdges = body.match(/-->\|[^|]+\|/g) ?? []
+        assert.equal(annotatedEdges.length, edges.length, `${path} has an unlabeled diagram flow`)
+      }
     }
   }
 })

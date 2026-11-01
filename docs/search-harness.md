@@ -1,5 +1,5 @@
 ---
-layout: page
+layout: default
 title: Search harness
 ---
 
@@ -36,16 +36,18 @@ The manifest supplies the available sources and categories. Results show the con
 ```mermaid
 %% caption: The app coordinates input, filters, and selection while the client handles index requests and result ordering.
 flowchart TD
-  User["User types a name or changes filters"] --> App["App.svelte<br/>debounces searches and cancels stale requests"]
-  App --> Input["SearchInput<br/>query and live status"]
-  App --> Refinements["RefinementPanel<br/>source/category filters and priority"]
-  App --> Client["JavaScript client<br/>fetch, decode, filter, rank"]
-  Client <--> Data["/data/index.json<br/>and routed shard files"]
-  Client -->|matches and moreAvailable| App
-  App --> Results["SearchResults<br/>up to 12 choices"]
+  User["User"] -->|types a name| Input["SearchInput<br/>query and live status"]
+  User -->|changes sources or categories| Refinements["RefinementPanel<br/>filters and priority"]
+  Input -->|query changes| App["App.svelte<br/>debounces searches and cancels stale requests"]
+  Refinements -->|filter changes| App
+  App -->|query, filters, and cancel signal| Client["JavaScript client<br/>fetch, decode, filter, rank"]
+  Client -->|GET manifest or matching shards| Data["/data/index.json<br/>and routed shard files"]
+  Data -->|manifest and compact rows| Client
+  Client -->|ranked matches and moreAvailable| App
+  App -->|up to 12 choices| Results["SearchResults"]
   Results -->|selected record| App
-  App --> Selection["SelectedPlace<br/>record details"]
-  App --> Info["LibraryInfo<br/>client and docs links"]
+  App -->|selected place details| Selection["SelectedPlace"]
+  App -->|client usage guidance| Info["LibraryInfo"]
 ```
 
 `npm run build` compiles the harness into `build/harness-preview/harness/`. The build also copies the three client bundles and `ATTRIBUTION.md` into the output's `client/` folder. The Pages workflow publishes the harness at `/harness/` alongside the Jekyll-rendered documentation. See [Build and size checks](build-and-size-checks.md).

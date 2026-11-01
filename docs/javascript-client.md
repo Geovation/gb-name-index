@@ -1,5 +1,5 @@
 ---
-layout: page
+layout: default
 title: JavaScript client
 ---
 
@@ -100,27 +100,27 @@ sequenceDiagram
   participant Client as JavaScript client
   participant Cache as Per-client cache
   participant Pages as GitHub Pages data
-  App->>Client: search("Baker", filters)
-  Client->>Cache: Look up index manifest
+  App->>Client: Search query and active filters
+  Client->>Cache: Check for cached manifest request
   alt First request or cache cleared
-    Client->>Pages: GET /data/index.json
+    Client->>Pages: GET /data/index.json (manifest)
     Pages-->>Client: Schema, routes, sources, and categories
-    Client->>Cache: Store manifest request
+    Client->>Cache: Cache manifest request
   else Manifest already loaded
     Cache-->>Client: Return cached manifest
   end
-  Client->>Client: Normalize query and follow prefix routes
+  Client->>Client: Normalize query and choose matching route
   alt Query resolves to one leaf
-    Client->>Pages: GET the matching shard
-    Pages-->>Client: Compact rows for that prefix
+    Client->>Pages: GET the matching leaf shard
+    Pages-->>Client: Compact rows for the query prefix
   else Query ends at a branch
     loop Until preview limit is reached
-      Client->>Pages: GET next child shard
-      Pages-->>Client: Compact rows for that child
+      Client->>Pages: GET the next child shard
+      Pages-->>Client: Compact rows for the child prefix
     end
   end
-  Client->>Client: Decode, filter, and rank records
-  Client-->>App: Records plus moreAvailable status
+  Client->>Client: Decode records, apply filters, and rank matches
+  Client-->>App: Matching records and moreAvailable status
 ```
 
 When a query identifies one leaf shard, the client reads that shard. If the query ends at a routing branch, it visits child shards in a stable order and returns a preview. `moreAvailable` is true when the preview has more child data or the selected leaf is marked as truncated in the manifest.

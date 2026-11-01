@@ -25,17 +25,19 @@ The client searches the published index by name prefix, and the [search harness]
 ```mermaid
 %% caption: Source releases become a tested data index, client, documentation site, and search harness.
 flowchart LR
-  OS["OS Open Names<br/>Quarterly CSV"] --> Build
-  Overture["Overture Places<br/>Monthly GeoParquet"] --> Build
-  Changes["Schedule, manual run,<br/>or source change"] --> Tests
+  OS["OS Open Names<br/>Quarterly CSV"]
+  Overture["Overture Places<br/>Monthly GeoParquet"]
+  Changes["Schedule, manual run,<br/>or source or docs change"] -->|start workflow| Tests
   subgraph Automation[GitHub Actions]
-    Tests["Run JavaScript and Python tests"] --> Build["Build index, client, docs, and harness"]
+    Tests["Run JavaScript and Python tests"] -->|tests pass| Build["Build index when needed; build client and harness"]
   end
-  Build --> Pages["GitHub Pages<br/>Jekyll deployment"]
-  Pages --> Data["Current data<br/>/data/"]
-  Pages --> Client["Latest client<br/>/client/"]
-  Pages --> Docs["Project guides<br/>site root"]
-  Pages --> Harness["Search demo<br/>/harness/"]
+  OS -->|quarterly CSV| Build
+  Overture -->|monthly GeoParquet| Build
+  Build -->|site files and index| Pages["GitHub Pages<br/>Cayman site"]
+  Pages -->|manifest and shards| Data["Current data<br/>/data/"]
+  Pages -->|ESM, CommonJS, browser bundles| Client["Latest client<br/>/client/"]
+  Pages -->|rendered Markdown| Docs["Project guides<br/>site root"]
+  Pages -->|compiled app| Harness["Search demo<br/>/harness/"]
 ```
 
 ## Built With
