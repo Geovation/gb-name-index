@@ -104,7 +104,7 @@ Run the JavaScript and Python tests before opening a pull request. See [Automati
 
 ## Versioning
 
-Push [Conventional Commits](https://www.conventionalcommits.org/) to `main` to request a release. The [release guide](docs/automation-and-releases.md#versioned-client-release) explains version bumps, release PRs, and manual tags.
+Work on a branch and open a pull request into `main`. After it merges, Release Please opens a separate release pull request; merging that PR publishes the release. See the [release guide](docs/automation-and-releases.md#versioned-client-release) for the full steps and manual release option.
 
 ## Authors
 

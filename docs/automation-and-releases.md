@@ -43,20 +43,31 @@ The `catalyst-docs` sync workflow can run this command from a checkout of this r
 
 ## Versioned client release
 
-Update the version in `package.json`, commit the change, then push a matching tag. For version `0.1.0`, the tag is `v0.1.0`:
+### Automatic release (recommended)
 
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
+Do not commit feature work directly to `main`. Work on a branch and open a normal pull request into `main`.
 
-Push [Conventional Commits](https://www.conventionalcommits.org/) to `main` to open or update a release PR:
+1. Use a Conventional Commit for the change. The pull request title should also use that format, especially when the PR will be squash-merged.
+2. Merge the feature pull request into `main`. This does **not** publish a release. It asks Release Please to open or update a separate release pull request.
+3. Review the release pull request. It updates the version in `package.json` and summarizes the changes that will be released.
+4. Merge the release pull request. Release Please creates the matching `vX.Y.Z` tag and GitHub Release. The workflow checks the tag against `package.json`, builds the client archive, and attaches it to the release.
+
+The commit type controls the requested version change:
 
 - `feat:` requests a minor version.
 - `fix:` or `perf:` requests a patch version.
 - `feat!:` or a `BREAKING CHANGE:` footer requests a major version.
 - `docs:`, `test:`, and `chore:` do not request a release by themselves.
 
-Merge the release PR to create the GitHub Release. `.github/workflows/release.yml` tests the code, builds the client, checks that the tag matches `package.json`, and attaches `gb-name-index-client-vX.Y.Z.zip`. Consumers can install the package from that Git tag with npm; the package remains unpublished to the npm registry. Manual `vX.Y.Z` tags remain supported.
+Allow GitHub Actions to create pull requests in the repository's Actions settings. The workflow requests `contents: write` and `pull-requests: write` permissions.
 
-For automatic release PRs, allow GitHub Actions to create pull requests in the repository's Actions settings. The workflow requests `contents: write` and `pull-requests: write` permissions.
+### Manual release
+
+Use this only when you want to choose the version yourself. Update `version` in `package.json`, commit and push that change to `main`, then create and push a tag with the exact same version. For version `0.1.0`, use `v0.1.0`:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Pushing the tag runs the release workflow, which checks that it matches `package.json`, tests and builds the client, and creates the GitHub Release with `gb-name-index-client-vX.Y.Z.zip`. Do not draft the release in the GitHub UI; the workflow creates it. Consumers can install the package from the tag with npm; it is not published to the npm registry.
