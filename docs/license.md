@@ -3,4 +3,4 @@ layout: page
 title: License
 ---
 
-{% include_relative ../LICENSE %}
+{% include license.md %}

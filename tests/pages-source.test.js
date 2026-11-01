@@ -38,7 +38,15 @@ test('Jekyll source uses GitHub Pages plugins for README and Markdown links', as
   const workflow = await readFile('.github/workflows/update-places.yml', 'utf8')
   assert.match(workflow, /actions\/jekyll-build-pages@v1/)
   assert.match(workflow, /web\/docs\.css web\/jekyll-mermaid\.js/)
+  assert.match(workflow, /cp ATTRIBUTION\.md build\/pages-source\/_includes\/attribution\.md/)
+  assert.match(workflow, /cp LICENSE build\/pages-source\/_includes\/license\.md/)
   assert.match(workflow, /actions\/deploy-pages@v4/)
+
+  const attributionPage = await readFile('docs/attribution.md', 'utf8')
+  const licensePage = await readFile('docs/license.md', 'utf8')
+  assert.match(attributionPage, /{% include attribution\.md %}/)
+  assert.match(licensePage, /{% include license\.md %}/)
+  assert.doesNotMatch(`${attributionPage}\n${licensePage}`, /include_relative \.\.\//)
 
   for (const [path, title] of pages) {
     const markdown = await readFile(path, 'utf8')
@@ -63,14 +71,14 @@ test('Catalyst export keeps guides flat and builds a harness against the public 
   execFileSync('node', ['scripts/export-catalyst-docs.mjs'], { stdio: 'pipe' })
 
   const exportDirectory = 'build/catalyst-docs/gb-name-index'
-    const entries = await readdir(exportDirectory, { withFileTypes: true })
+  const entries = await readdir(exportDirectory, { withFileTypes: true })
   const pages = entries.filter(entry => entry.isFile() && entry.name.endsWith('.md'))
   const directories = entries.filter(entry => entry.isDirectory()).map(entry => entry.name).sort()
   const index = await readFile(`${exportDirectory}/index.md`, 'utf8')
   const builders = await readFile(`${exportDirectory}/data-builders.md`, 'utf8')
   const harness = await readFile(`${exportDirectory}/harness/index.html`, 'utf8')
   const bundles = await Promise.all(
-      (await readdir(`${exportDirectory}/assets`))
+    (await readdir(`${exportDirectory}/assets`))
       .filter(path => path.endsWith('.js'))
       .map(path => readFile(`${exportDirectory}/assets/${path}`, 'utf8'))
   )

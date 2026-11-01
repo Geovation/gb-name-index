@@ -68,6 +68,8 @@ jobs:
           mkdir -p build/pages-source
           cp README.md ATTRIBUTION.md LICENSE _config.yml build/pages-source/
           cp -R _includes assets docs build/pages-source/
+          cp ATTRIBUTION.md build/pages-source/_includes/attribution.md
+          cp LICENSE build/pages-source/_includes/license.md
           cp web/docs.css web/jekyll-mermaid.js build/pages-source/
           mkdir -p build/pages-source/fonts
           cp node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2 build/pages-source/fonts/
