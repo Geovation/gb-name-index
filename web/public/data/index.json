@@ -1,0 +1,70 @@
+{
+  "product": "GB Name Index local sample",
+  "release": "synthetic sample records",
+  "source": "Local fixture for harness development only",
+  "records": 4,
+  "shards": 1,
+  "minimumQueryLength": 3,
+  "maxShardBytes": 65536,
+  "maxResultsPerShard": 50,
+  "routes": {},
+  "truncated": {},
+  "schema": [
+    "name",
+    "category",
+    "subtype",
+    "locality",
+    "postcodeDistrict",
+    "region",
+    "longitude",
+    "latitude",
+    "bbox",
+    "source"
+  ],
+  "subtypes": [
+    "Rail facility",
+    "Road"
+  ],
+  "localities": [
+    "Sampleton"
+  ],
+  "postcodeDistricts": [],
+  "regions": [
+    "Example County"
+  ],
+  "sources": [
+    "Sample: OS Open Names",
+    "Sample: Overture Places"
+  ],
+  "categories": [
+    "park",
+    "populatedPlace",
+    "transportNetwork"
+  ],
+  "categoriesBySource": {
+    "Sample: OS Open Names": [
+      "populatedPlace",
+      "transportNetwork"
+    ],
+    "Sample: Overture Places": [
+      "park",
+      "transportNetwork"
+    ]
+  },
+  "categoryLabelsBySource": {
+    "Sample: OS Open Names": {
+      "populatedPlace": "Settlement (sample)",
+      "transportNetwork": "Road (sample)"
+    },
+    "Sample: Overture Places": {
+      "park": "Park (sample)",
+      "transportNetwork": "Station (sample)"
+    }
+  },
+  "coordinatePrecision": 5,
+  "format": "adaptive-prefix-record-arrays-v4",
+  "normalization": "casefold; remove non-alphanumeric characters",
+  "attribution": {
+    "note": "Synthetic sample records only; not source data."
+  }
+}

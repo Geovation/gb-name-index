@@ -1,7 +1,27 @@
 const defaultBaseUrl = 'https://geovation.github.io/gb-name-index/data'
+const recordDictionaries = {
+  category: 'categories',
+  subtype: 'subtypes',
+  locality: 'localities',
+  postcodeDistrict: 'postcodeDistricts',
+  region: 'regions',
+  source: 'sources'
+}
+
+/** Credits and license links to show when using records from this index. */
+export const dataAttribution = Object.freeze({
+  osOpenNames: `Contains OS data \u00a9 Crown copyright and database rights Ordnance Survey ${new Date().getFullYear()}.`,
+  osOpenNamesSource: 'https://www.ordnancesurvey.co.uk/products/os-open-names',
+  osOpenNamesLicense: 'https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/',
+  overturePlaces: 'Overture Maps Foundation, overturemaps.org',
+  overtureLicense: 'CDLA-Permissive-2.0 and Apache-2.0, depending on source.',
+  overtureLicenseDetails: 'https://docs.overturemaps.org/guides/places/',
+  overtureAttribution: 'https://docs.overturemaps.org/attribution/'
+})
 
 /**
- * Normalizes a search term or name for case-insensitive prefix matching.
+ * Makes a query comparable with indexed names by lowercasing it and removing
+ * spaces, punctuation, and other non-alphanumeric characters.
  *
  * @param {unknown} query - Value to normalize.
  * @returns {string} The lowercase alphanumeric representation of the value.
@@ -13,7 +33,7 @@ export function normalize (query) {
 }
 
 /**
- * Maps values to their ranking position in a priority list.
+ * Turns an ordered preference list into ranks used when sorting results.
  *
  * @param {string[]} [values=[]] - Values ordered from highest to lowest priority.
  * @returns {Map<string, number>} Value-to-priority mapping.
@@ -23,7 +43,7 @@ function buildPriorityMap (values = []) {
 }
 
 /**
- * Gets a value's priority, placing unlisted values after all listed values.
+ * Returns a value's rank, placing values not named by the caller last.
  *
  * @param {string} value - Value whose priority is required.
  * @param {Map<string, number>} priorities - Value-to-priority mapping.
@@ -34,32 +54,33 @@ function getPriorityRank (value, priorities) {
 }
 
 /**
- * Builds a deterministic record comparator for a query and configured priorities.
+ * Sorts exact-name matches first, then applies the caller's source and category
+ * preferences. The final fields make ties sort consistently between searches.
  *
  * @param {string} query - Original search query.
  * @param {Map<string, number>} sourcePriorities - Source ranking map.
- * @param {Map<string, number>} typePriorities - Type ranking map.
+ * @param {Map<string, number>} categoryPriorities - Category ranking map.
  * @returns {(left: Record<string, unknown>, right: Record<string, unknown>) => number} Record comparator.
  */
-function compareRecordsByPriority (query, sourcePriorities, typePriorities) {
+function compareRecordsByPriority (query, sourcePriorities, categoryPriorities) {
   const normalizedQuery = normalize(query)
   return (left, right) => {
     const exactNameDifference =
-      Number(normalize(right.NAME1) === normalizedQuery) -
-      Number(normalize(left.NAME1) === normalizedQuery)
+      Number(normalize(right.name) === normalizedQuery) -
+      Number(normalize(left.name) === normalizedQuery)
     if (exactNameDifference) return exactNameDifference
 
     const sourceDifference =
-      getPriorityRank(left.SOURCE, sourcePriorities) -
-      getPriorityRank(right.SOURCE, sourcePriorities)
+      getPriorityRank(left.source, sourcePriorities) -
+      getPriorityRank(right.source, sourcePriorities)
     if (sourceDifference) return sourceDifference
 
     const typeDifference =
-      getPriorityRank(left.TYPE, typePriorities) -
-      getPriorityRank(right.TYPE, typePriorities)
+      getPriorityRank(left.category, categoryPriorities) -
+      getPriorityRank(right.category, categoryPriorities)
     if (typeDifference) return typeDifference
 
-    return ['NAME1', 'LOCALITY', 'REGION', 'TYPE', 'SOURCE'].reduce(
+    return ['name', 'locality', 'region', 'category', 'subtype', 'source'].reduce(
       (difference, field) =>
         difference ||
         String(left[field] ?? '').localeCompare(String(right[field] ?? '')),
@@ -69,21 +90,21 @@ function compareRecordsByPriority (query, sourcePriorities, typePriorities) {
 }
 
 /**
- * Creates a client for the static GB name prefix index.
+ * Creates a client that reads and searches the static GB name index.
  *
- * @param {object} [options={}] - Client configuration.
- * @param {string} [options.baseUrl] - URL of the directory containing index shards.
- * @param {typeof fetch} [options.fetch] - Fetch implementation used to request index files.
- * @param {string[]} [options.sourcePriority] - Default source ranking.
- * @param {string[]} [options.typePriority] - Default type ranking.
- * @returns {{search: Function, metadata: Function, clearCache: Function}} Frozen name-index client.
- * @throws {TypeError} When no fetch implementation is supplied.
+ * @param {object} [options={}] - Settings for this client instance.
+ * @param {string} [options.baseUrl] - Folder URL containing `index.json` and its shard files.
+ * @param {typeof fetch} [options.fetch] - Fetch function; defaults to the runtime's global `fetch`.
+ * @param {string[]} [options.sourcePriority] - Sources to rank first, in display order.
+ * @param {string[]} [options.categoryPriority] - Categories to rank first, in display order.
+ * @returns {{search: Function, metadata: Function, clearCache: Function}} Client methods with an independent request cache.
+ * @throws {TypeError} If the runtime does not provide `fetch` and none is passed in `options`.
  */
 export function createNameIndex ({
   baseUrl = defaultBaseUrl,
   fetch: fetcher = globalThis.fetch,
   sourcePriority = ['OS Open Names', 'Overture Places'],
-  typePriority = []
+  categoryPriority = []
 } = {}) {
   if (typeof fetcher !== 'function') {
     throw new TypeError('A fetch implementation is required')
@@ -92,14 +113,14 @@ export function createNameIndex ({
   const cache = new Map()
   const base = baseUrl.replace(/\/+$/, '')
   const defaultSourcePriorities = buildPriorityMap(sourcePriority)
-  const defaultTypePriorities = buildPriorityMap(typePriority)
+  const defaultCategoryPriorities = buildPriorityMap(categoryPriority)
   let manifestRequest
 
   /**
-   * Loads and caches the index manifest.
+    * Fetches `index.json` once and reuses it for later calls from this client.
    *
-   * @param {AbortSignal} [signal] - Signal used to cancel the initial request.
-   * @returns {Promise<Record<string, unknown>>} Index manifest.
+    * @param {AbortSignal} [signal] - Cancels the fetch if this call starts it.
+    * @returns {Promise<Record<string, unknown>>} Manifest describing the data and its shard layout.
    */
   function loadManifest (signal) {
     if (!manifestRequest) {
@@ -118,11 +139,11 @@ export function createNameIndex ({
   }
 
   /**
-   * Loads and caches one leaf shard of encoded records.
+    * Fetches one result shard and shares that request with later searches.
    *
-   * @param {string} prefix - Leaf-shard prefix.
-   * @param {AbortSignal} [signal] - Signal used to cancel the initial request.
-   * @returns {Promise<unknown[][]>} Encoded record rows, or an empty array for a missing shard.
+    * @param {string} prefix - Prefix used as the shard file name.
+    * @param {AbortSignal} [signal] - Cancels the fetch if this call starts it.
+    * @returns {Promise<unknown[][]>} Compact rows, or an empty list when the shard does not exist.
    */
   async function loadShard (prefix, signal) {
     if (!cache.has(prefix)) {
@@ -147,21 +168,25 @@ export function createNameIndex ({
   }
 
   /**
-   * Converts a compact encoded row into a named record.
+    * Turns one compact row back into a record with field names.
    *
-   * @param {unknown[]} row - Encoded shard row.
-   * @param {{schema: string[], sources: string[]}} manifest - Index manifest.
-   * @returns {Record<string, unknown>} Decoded record without empty fields.
+    * @param {unknown[]} row - Values in the order listed by the manifest schema.
+    * @param {{schema: string[], [key: string]: unknown}} manifest - Field names and lookup tables for compact row values.
+    * @returns {Record<string, unknown>} Record with named fields and empty values removed.
    */
   function decodeRecord (row, manifest) {
     return Object.fromEntries(
       manifest.schema
-        .map((field, index) => [
-          field,
-          field === 'SOURCE' && Number.isInteger(row[index])
-            ? manifest.sources[row[index]]
-            : row[index]
-        ])
+        .map((field, index) => {
+          const dictionaryName = recordDictionaries[field]
+          const dictionary = dictionaryName ? manifest[dictionaryName] : undefined
+          return [
+            field,
+            Array.isArray(dictionary) && Number.isInteger(row[index])
+              ? dictionary[row[index]]
+              : row[index]
+          ]
+        })
         .filter(
           ([, value]) => value !== null && value !== undefined && value !== ''
         )
@@ -169,14 +194,14 @@ export function createNameIndex ({
   }
 
   /**
-   * Selects a leaf shard, preview route, or no result plan for a normalized prefix.
+    * Finds which shard or route can answer a normalized query.
    *
-   * A leaf contains every matching row; an incomplete route requires a bounded
-   * descendant traversal to provide a preview.
+    * A leaf contains the query's rows. If the query ends at a branch, the caller
+    * must visit child shards to build a limited preview.
    *
-   * @param {string} prefix - Normalized query prefix.
-   * @param {Record<string, unknown>} manifest - Index manifest.
-   * @returns {{kind: 'none'} | {kind: 'leaf', shard: string} | {kind: 'preview', node: string}} Search plan.
+    * @param {string} prefix - Query after name normalization.
+    * @param {Record<string, unknown>} manifest - Routing rules and minimum query length.
+    * @returns {{kind: 'none'} | {kind: 'leaf', shard: string} | {kind: 'preview', node: string}} How to fetch matches for this query.
    */
   function planSearchRoute (prefix, manifest) {
     const minimumLength =
@@ -194,16 +219,16 @@ export function createNameIndex ({
   }
 
   /**
-   * Collects a bounded, deterministic preview from descendant shards of a route.
+    * Reads child shards in a stable order until the preview has enough records.
    *
-   * Every visited leaf shares the query prefix, so callers only need to apply
-   * source and type refinements to the returned rows.
+    * Every child belongs to the query prefix. Search applies source and category
+    * filters after these rows have been collected.
    *
-   * @param {string} node - Route node to traverse.
-   * @param {Record<string, unknown>} manifest - Index manifest.
-   * @param {number} previewLimit - Maximum number of encoded rows to collect.
-   * @param {AbortSignal} [signal] - Signal used to cancel shard requests.
-   * @returns {Promise<{rows: unknown[][], moreAvailable: boolean}>} Preview rows and availability marker.
+    * @param {string} node - Branch prefix whose child shards contain the matches.
+    * @param {Record<string, unknown>} manifest - Child-shard routing rules.
+    * @param {number} previewLimit - Target number of rows before traversal stops.
+    * @param {AbortSignal} [signal] - Cancels any child-shard fetch started here.
+    * @returns {Promise<{rows: unknown[][], moreAvailable: boolean}>} Preview rows and whether another child remains.
    */
   async function collectPreviewRows (node, manifest, previewLimit, signal) {
     const routes = manifest.routes ?? {}
@@ -226,27 +251,27 @@ export function createNameIndex ({
 
   return Object.freeze({
     /**
-     * Searches records whose normalized names start with the supplied query.
+      * Finds names that begin with the query after punctuation and spacing are ignored.
      *
-     * @param {string} query - Prefix to search.
-     * @param {object} [options={}] - Per-search options.
-     * @param {AbortSignal} [options.signal] - Signal used to cancel requests.
-     * @param {string[]} [options.sources] - Included sources.
-     * @param {string[]} [options.types] - Included types.
-     * @param {number} [options.previewLimit=20] - Maximum rows gathered for an incomplete route.
-     * @param {string[]} [options.sourcePriority] - Source ranking for this search.
-     * @param {string[]} [options.typePriority] - Type ranking for this search.
-     * @returns {Promise<Array<Record<string, unknown>> & {moreAvailable?: boolean}>} Matching records.
+      * @param {string} query - Name or beginning of a name to find.
+      * @param {object} [options={}] - Optional filters, ranking preferences, and cancellation signal.
+      * @param {AbortSignal} [options.signal] - Stops the manifest or shard request started by this search.
+      * @param {string[]} [options.sources] - Only return records from these datasets.
+      * @param {string[]} [options.categories] - Only return records in these broad categories.
+      * @param {number} [options.previewLimit=20] - Target size when the query matches a branch with multiple shards.
+      * @param {string[]} [options.sourcePriority] - Sources to rank first, in display order.
+      * @param {string[]} [options.categoryPriority] - Categories to rank first, in display order.
+      * @returns {Promise<Array<Record<string, unknown>> & {moreAvailable?: boolean}>} Sorted records; `moreAvailable` marks previews or capped exact-name groups.
      */
     async search (
       query,
       {
         signal,
         sources,
-        types,
+        categories,
         previewLimit = 20,
         sourcePriority: searchSourcePriority = sourcePriority,
-        typePriority: searchTypePriority = typePriority
+        categoryPriority: searchCategoryPriority = categoryPriority
       } = {}
     ) {
       const prefix = normalize(query)
@@ -271,41 +296,42 @@ export function createNameIndex ({
         searchSourcePriority === sourcePriority
           ? defaultSourcePriorities
           : buildPriorityMap(searchSourcePriority)
-      const typePriorities =
-        searchTypePriority === typePriority
-          ? defaultTypePriorities
-          : buildPriorityMap(searchTypePriority)
+      const categoryPriorities =
+        searchCategoryPriority === categoryPriority
+          ? defaultCategoryPriorities
+          : buildPriorityMap(searchCategoryPriority)
       const sourceFilter = sources === undefined ? undefined : new Set(sources)
-      const typeFilter = types === undefined ? undefined : new Set(types)
+      const categoryFilter = categories === undefined ? undefined : new Set(categories)
       const results = rows
         .map(row => decodeRecord(row, manifest))
         .filter(
           record =>
-            normalize(record.NAME1).startsWith(prefix) &&
-            (!sourceFilter || sourceFilter.has(record.SOURCE)) &&
-            (!typeFilter || typeFilter.has(record.TYPE))
+            normalize(record.name).startsWith(prefix) &&
+            (!sourceFilter || sourceFilter.has(record.source)) &&
+            (!categoryFilter || categoryFilter.has(record.category))
         )
-        .sort(compareRecordsByPriority(query, sourcePriorities, typePriorities))
+          .sort(compareRecordsByPriority(query, sourcePriorities, categoryPriorities))
       return Object.assign(results, { moreAvailable })
     },
     /**
-     * Retrieves the cached index manifest.
+      * Returns index details such as available filters, sources, and shard routes.
      *
-     * @param {object} [options={}] - Request options.
-     * @param {AbortSignal} [options.signal] - Signal used to cancel the initial request.
-     * @returns {Promise<Record<string, unknown>>} Index manifest.
+      * @param {object} [options={}] - Request settings.
+      * @param {AbortSignal} [options.signal] - Cancels the fetch if this call loads the manifest.
+      * @returns {Promise<Record<string, unknown>>} The manifest, cached for this client.
      */
     metadata ({ signal } = {}) {
       return loadManifest(signal)
     },
-    /** Clears cached manifest and shard data. */
+    /** Forget the manifest and shards so the next search loads current files. */
     clearCache () {
       cache.clear()
+      manifestRequest = undefined
     }
   })
 }
 
-/** Default client configured to use the hosted Great Britain name index. */
+/** Shared client that searches the current GitHub Pages index. */
 export const nameIndex = createNameIndex()
-/** Searches the hosted index with the default client. */
+/** Convenience function that searches with the shared default client. */
 export const search = nameIndex.search

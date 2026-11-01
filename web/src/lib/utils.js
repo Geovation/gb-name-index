@@ -1,5 +1,5 @@
 /**
- * Converts a machine-readable identifier to a space-separated display label.
+ * Turns identifiers such as `historic_site` into labels people can scan.
  *
  * @param {string} label - Identifier to format.
  * @returns {string} Display label.
@@ -9,73 +9,101 @@ export function formatLabel (label) {
 }
 
 /**
- * Resolves a source-specific type label, with a readable fallback.
+ * Uses the source's preferred category wording, or formats the category when
+ * the manifest does not contain a label for it.
  *
  * @param {string} source - Record source name.
- * @param {string} type - Source type identifier.
- * @param {Record<string, Record<string, string>>} [typeLabelsBySource={}] - Source label mappings.
- * @returns {string} Display label for the type.
+ * @param {string} category - Category identifier.
+ * @param {Record<string, Record<string, string>>} [categoryLabelsBySource={}] - Source label mappings.
+ * @returns {string} Display label for the category.
  */
-export function typeLabel (source, type, typeLabelsBySource = {}) {
-  if (!type) return type
-  return typeLabelsBySource[source]?.[type] ?? formatLabel(type)
+export function categoryLabel (source, category, categoryLabelsBySource = {}) {
+  if (!category) return category
+  return categoryLabelsBySource[source]?.[category] ?? formatLabel(category)
 }
 
 /**
- * Formats a record's coordinates for display when both values are finite.
+ * Labels a selected category using the first selected source with a published label.
  *
- * @param {{LATITUDE?: number, LONGITUDE?: number}} record - Place record.
+ * @param {string} category - Category identifier to display.
+ * @param {string[]} selectedSources - Sources currently included in the search.
+ * @param {Record<string, string[]>} categoriesBySource - Categories available from each source.
+ * @param {Record<string, Record<string, string>>} categoryLabelsBySource - Source-specific display labels.
+ * @returns {string} Readable label for the selected category.
+ */
+export function selectedCategoryLabel (
+  category,
+  selectedSources,
+  categoriesBySource,
+  categoryLabelsBySource = {}
+) {
+  const sourceWithLabel = selectedSources.find(source =>
+    categoriesBySource[source]?.includes(category) &&
+    categoryLabelsBySource[source]?.[category]
+  )
+  const sourceWithCategory = selectedSources.find(source =>
+    categoriesBySource[source]?.includes(category)
+  )
+  const source = sourceWithLabel ?? sourceWithCategory
+  return source
+    ? categoryLabel(source, category, categoryLabelsBySource)
+    : formatLabel(category)
+}
+
+/**
+ * Makes a coordinate pair readable for the selected-place details.
+ *
+ * @param {{latitude?: number, longitude?: number}} record - Place record.
  * @returns {string} Coordinate label, or an empty string when unavailable.
  */
 export function coordinateLabel (record) {
-  if (!Number.isFinite(record.LATITUDE) || !Number.isFinite(record.LONGITUDE))
+  if (!Number.isFinite(record.latitude) || !Number.isFinite(record.longitude))
     return ''
-  return `${record.LATITUDE.toFixed(5)}, ${record.LONGITUDE.toFixed(5)}`
+  return `${record.latitude.toFixed(5)}, ${record.longitude.toFixed(5)}`
 }
 
 /**
- * Produces contextual metadata to distinguish a result from similarly named places.
+ * Builds the short line shown under a result name so repeated names are easier
+ * to tell apart. Coordinates are added when the other context is still shared.
  *
  * @param {Record<string, string | number | undefined>} record - Result record.
- * @param {Record<string, string[]>} typesBySource - Types indexed by source.
- * @param {Record<string, Record<string, string>>} typeLabelsBySource - Type labels indexed by source.
+ * @param {Record<string, Record<string, string>>} categoryLabelsBySource - Category labels indexed by source.
  * @param {Map<string, number>} resultNameCounts - Count for each normalized result name.
  * @param {Map<string, number>} resultContextCounts - Count for each result context.
  * @returns {string} Human-readable result metadata.
  */
 export function resultMeta (
   record,
-  typesBySource,
-  typeLabelsBySource,
+  categoryLabelsBySource,
   resultNameCounts,
   resultContextCounts
 ) {
   const context = [
-    record.NAME1,
-    record.LOCALITY,
-    record.POSTCODE_DISTRICT,
-    record.REGION
+    record.name,
+    record.locality,
+    record.postcodeDistrict,
+    record.region
   ]
     .join('|')
     .toLowerCase()
   const needsCoordinates =
-    resultNameCounts.get(record.NAME1.toLowerCase()) > 1 &&
+    resultNameCounts.get(record.name.toLowerCase()) > 1 &&
     resultContextCounts.get(context) > 1
   return [
-    record.LOCAL_TYPE ||
-      typeLabel(record.SOURCE, record.TYPE, typeLabelsBySource),
-    record.LOCALITY,
-    record.POSTCODE_DISTRICT,
-    record.REGION,
+    record.subtype ||
+      categoryLabel(record.source, record.category, categoryLabelsBySource),
+    record.locality,
+    record.postcodeDistrict,
+    record.region,
     needsCoordinates && coordinateLabel(record),
-    record.SOURCE
+    record.source
   ]
     .filter(Boolean)
     .join(' · ')
 }
 
 /**
- * Adds or removes a value from a list without mutating the original list.
+ * Toggles a selected filter without mutating the list held in Svelte state.
  *
  * @template T
  * @param {T[]} list - Existing values.
@@ -89,13 +117,13 @@ export function toggle (list, value) {
 }
 
 /**
- * Moves a list item by one position without mutating the original list.
+ * Changes a source or type's ranking position without mutating its current list.
  *
  * @template T
  * @param {T[]} list - Existing values.
  * @param {number} index - Index of the value to move.
- * @param {number} direction - Position offset, normally -1 or 1.
- * @returns {T[]} Reordered list, or the original list when the move is out of bounds.
+ * @param {number} direction - Use `-1` to move up or `1` to move down.
+ * @returns {T[]} Reordered list, or the original list if the item is already at that edge.
  */
 export function move (list, index, direction) {
   const nextIndex = index + direction

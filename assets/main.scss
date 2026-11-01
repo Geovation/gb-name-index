@@ -1,0 +1,64 @@
+---
+---
+
+@import "minima";
+
+@font-face {
+  font-family: "Manrope";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("../fonts/manrope-latin-wght-normal.woff2") format("woff2");
+}
+
+body {
+  font-family: "Manrope", sans-serif;
+}
+
+a {
+  color: #2859d6;
+}
+
+.site-title,
+.page-heading {
+  color: #1b2432;
+  font-weight: 700;
+}
+
+.wrapper {
+  max-width: 1120px;
+}
+
+.site-header {
+  border-top-color: #2859d6;
+}
+
+.site-footer {
+  font-size: 0.85rem;
+}
+
+.diagram {
+  overflow-x: auto;
+  margin: 24px 0;
+  border: 1px solid #d7dbe2;
+  border-radius: 4px;
+  background: #ffffff;
+  padding: 20px;
+}
+
+.mermaid {
+  overflow-x: auto;
+  text-align: center;
+}
+
+.diagram figcaption {
+  border-top: 1px solid #e1e4ea;
+  color: #596374;
+  padding: 11px 16px;
+}
+
+@media (max-width: 600px) {
+  .diagram {
+    padding: 12px;
+  }
+}

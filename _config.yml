@@ -1,0 +1,24 @@
+title: GB Name Index
+description: A common searchable index built from OS Open Names and Overture Places.
+url: https://geovation.github.io
+baseurl: /gb-name-index
+theme: minima
+permalink: pretty
+plugins:
+  - jekyll-feed
+  - jekyll-readme-index
+  - jekyll-relative-links
+  - jekyll-seo-tag
+readme_index:
+  remove_originals: true
+relative_links:
+  enabled: true
+header_pages:
+  - docs/data-builders.md
+  - docs/javascript-client.md
+  - docs/search-harness.md
+  - docs/testing.md
+  - docs/build-and-size-checks.md
+  - docs/automation-and-releases.md
+  - docs/attribution.md
+  - docs/license.md

@@ -1,0 +1,21 @@
+.diagram {
+  overflow-x: auto;
+  margin: 24px 0;
+  border: 1px solid #d7dbe2;
+  border-radius: 4px;
+  background: #ffffff;
+  padding: 20px;
+}
+
+.mermaid {
+  overflow-x: auto;
+  text-align: center;
+}
+
+.diagram figcaption {
+  border-top: 1px solid #e1e4ea;
+  color: #596374;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  padding: 11px 16px;
+}

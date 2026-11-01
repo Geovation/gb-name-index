@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download OS Open Names and build a static prefix index."""
+"""Download OS Open Names and turn its records into a searchable static index."""
 
 from __future__ import annotations
 
@@ -25,8 +25,10 @@ from .config import (
     MINIMUM_SHARD_LENGTH,
     OS_OPEN_NAMES_DOWNLOAD_URL,
     OS_OPEN_NAMES_PRODUCT_NAME,
-    OS_OPEN_NAMES_TYPE_LABELS,
+    OS_OPEN_NAMES_CATEGORY_LABELS,
+    RECORD_DICTIONARIES,
     RECORD_FIELDS,
+    SOURCE_RECORD_FIELDS,
     SOURCES,
 )
 
@@ -35,7 +37,7 @@ OSGB36_TO_WGS84 = Transformer.from_crs("EPSG:27700", "EPSG:4326", always_xy=True
 
 
 def release_from_redirect(download_url: str) -> str:
-    """Return the OS Open Names release identifier from a download redirect."""
+    """Read the OS release name from the archive URL returned by its download endpoint."""
     response = requests.get(download_url, allow_redirects=False, timeout=60)
     response.raise_for_status()
     location = response.headers.get("Location")
@@ -55,7 +57,11 @@ def append_names(
     records: list[dict[str, object]],
     maximum_records: int | None,
 ) -> bool:
-    """Append CSV records and report whether the optional record limit was reached."""
+    """Add named CSV rows as index records, converting valid grid coordinates to WGS 84.
+
+    Return True as soon as `maximum_records` is reached so callers can stop reading
+    a large archive early. Return False when the CSV ends before that limit.
+    """
     for row in reader:
         name = (row.get(columns["NAME1"]) or "").strip()
         if not name:
@@ -87,7 +93,11 @@ def append_names(
 
 
 def read_names(archive: Path, maximum_records: int | None = None) -> list[dict[str, object]]:
-    """Read OS Open Names records from an archive, optionally stopping at a limit."""
+    """Read OS records from the downloaded ZIP, including both supported CSV layouts.
+
+    OS archives may provide a separate header CSV or repeat the header in each
+    data file. `maximum_records` is intended for small local builds and tests.
+    """
     records: list[dict[str, object]] = []
     with zipfile.ZipFile(archive) as zipped:
         csv_names = [name for name in zipped.namelist() if name.lower().endswith(".csv")]
@@ -124,31 +134,38 @@ def read_names(archive: Path, maximum_records: int | None = None) -> list[dict[s
 
 
 def normalize_name(value: object) -> str:
-    """Return a case-insensitive alphanumeric key for a place name."""
+    """Make a name suitable for prefix routing by removing case and punctuation differences."""
     return re.sub(r"[^a-z0-9]", "", str(value).casefold())
 
 
 def compact_value(field: str, value: object) -> object:
-    """Round geographic coordinates while preserving every other field value."""
-    if field in ("LONGITUDE", "LATITUDE") and isinstance(value, (int, float)) and math.isfinite(value):
+    """Round coordinates to the published precision while leaving other values unchanged."""
+    if field in ("longitude", "latitude") and isinstance(value, (int, float)) and math.isfinite(value):
         return round(value, COORDINATE_DECIMAL_PLACES)
+    if field == "bbox" and isinstance(value, list) and len(value) == 4:
+        return [
+            round(coordinate, COORDINATE_DECIMAL_PLACES)
+            if isinstance(coordinate, (int, float)) and math.isfinite(coordinate)
+            else coordinate
+            for coordinate in value
+        ]
     return value
 
 
-def display_type_label(source: str, type_name: str) -> str:
-    """Return a user-facing label for a source-specific type value."""
+def display_category_label(source: str, category_name: str) -> str:
+    """Show a readable category name instead of a source's raw identifier."""
     if source == "OS Open Names":
-        return OS_OPEN_NAMES_TYPE_LABELS.get(type_name, type_name)
-    return type_name.replace("_", " ").title()
+        return OS_OPEN_NAMES_CATEGORY_LABELS.get(category_name, category_name)
+    return category_name.replace("_", " ").title()
 
 
 def encoded_size(rows: list[list[object | None]]) -> int:
-    """Return the UTF-8 byte size of a shard's compact JSON representation."""
+    """Measure the exact compact JSON file size used to decide whether a shard must split."""
     return len(json.dumps(rows, ensure_ascii=True, separators=(",", ":")).encode("utf-8")) + 1
 
 
 def stable_sort(rows: list[list[object | None]]) -> list[list[object | None]]:
-    """Return rows in a deterministic order, including rows with empty values."""
+    """Put rows in a repeatable order so the same source data produces stable files."""
     return sorted(rows, key=lambda row: tuple("" if value is None else str(value) for value in row))
 
 
@@ -159,7 +176,12 @@ def split_shard(
     leaves: dict[str, list[list[object | None]]],
     truncated: dict[str, int],
 ) -> None:
-    """Split rows into size-bounded prefix leaves, recording routes and truncation."""
+    """Write small groups as leaf shards and split large groups into longer prefixes.
+
+    `routes` records which next characters lead to child groups. If too many
+    records share one exact name to split further, keep the configured shortlist
+    and record the full count in `truncated`.
+    """
     rows = stable_sort(rows)
     names = {normalize_name(row[0]) for row in rows}
     if len(names) == 1 and len(rows) > MAXIMUM_RESULTS_PER_SHARD:
@@ -193,16 +215,42 @@ def split_shard(
 
 
 def build(records: list[dict[str, object]], output: Path, release: str, source_url: str) -> None:
-    """Build an adaptive-prefix index and manifest from normalized place records."""
+    """Write compact shards and the manifest that explains how to search them.
+
+    Each input record is encoded in the order listed by `RECORD_FIELDS`; the
+    manifest includes source/type filters and the routing table used by the client.
+    """
     roots: dict[str, list[list[object | None]]] = {}
+    source_fields = dict(zip(RECORD_FIELDS, SOURCE_RECORD_FIELDS))
+    dictionaries = {}
+    for field in RECORD_DICTIONARIES:
+        values = {
+            str(value)
+            for record in records
+            if (value := record.get(source_fields[field], record.get(field))) not in (None, "")
+        }
+        if field == "source":
+            values.update(SOURCES)
+        dictionaries[field] = sorted(values)
+    dictionary_indexes = {
+        field: {value: index for index, value in enumerate(values)}
+        for field, values in dictionaries.items()
+    }
     for record in records:
-        normalized = normalize_name(record["NAME1"])
+        name = record.get(source_fields["name"], record.get("name", ""))
+        normalized = normalize_name(name)
         if not normalized:
             continue
         shard = normalized[:MINIMUM_SHARD_LENGTH]
-        values = [compact_value(field, record.get(field)) for field in RECORD_FIELDS]
-        if values[-1] in SOURCES:
-            values[-1] = SOURCES.index(values[-1])
+        values = []
+        for field in RECORD_FIELDS:
+            value = compact_value(
+                field,
+                record.get(source_fields[field], record.get(field)),
+            )
+            if field in dictionary_indexes and value not in (None, ""):
+                value = dictionary_indexes[field][str(value)]
+            values.append(value)
         roots.setdefault(shard, []).append(values)
 
     output.mkdir(parents=True, exist_ok=True)
@@ -226,28 +274,36 @@ def build(records: list[dict[str, object]], output: Path, release: str, source_u
         "routes": routes,
         "truncated": truncated,
         "schema": RECORD_FIELDS,
-        "sources": SOURCES,
-        "types": sorted({str(record.get("TYPE")) for record in records if record.get("TYPE")}),
-        "typesBySource": {
+        "categories": dictionaries["category"],
+        "subtypes": dictionaries["subtype"],
+        "localities": dictionaries["locality"],
+        "postcodeDistricts": dictionaries["postcodeDistrict"],
+        "regions": dictionaries["region"],
+        "sources": dictionaries["source"],
+        "categoriesBySource": {
             source: sorted({str(record.get("TYPE")) for record in records if record.get("SOURCE") == source and record.get("TYPE")})
             for source in SOURCES
         },
-        "typeLabelsBySource": {
+        "categoryLabelsBySource": {
             source: {
-                type_name: display_type_label(source, type_name)
-                for type_name in sorted({str(record.get("TYPE")) for record in records if record.get("SOURCE") == source and record.get("TYPE")})
+                category_name: display_category_label(source, category_name)
+                for category_name in sorted({str(record.get("TYPE")) for record in records if record.get("SOURCE") == source and record.get("TYPE")})
             }
             for source in SOURCES
         },
         "coordinatePrecision": COORDINATE_DECIMAL_PLACES,
-        "format": "adaptive-prefix-record-arrays-v1",
+        "format": "adaptive-prefix-record-arrays-v4",
         "normalization": "casefold; remove non-alphanumeric characters",
     }
     (output / "index.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
 
 def main() -> int:
-    """Download OS Open Names if needed and write its static prefix index."""
+    """Download or reuse the current OS archive, then build an OS-only index.
+
+    Use `--max-records` for a small test output; normal builds read the complete
+    source archive and replace the selected output directory.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--download-url", default=OS_OPEN_NAMES_DOWNLOAD_URL)
     parser.add_argument("--output", type=Path, default=Path(__file__).parent.parent / "build" / "data" / "os-open-names")

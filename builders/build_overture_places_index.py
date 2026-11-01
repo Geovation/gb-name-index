@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a static prefix index from Overture Places GeoParquet files."""
+"""Read Overture Places GeoParquet data and build a static search index."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from .config import OVERTURE_PLACE_COLLECTION_URL, OVERTURE_PLACES_PRODUCT_NAME,
 
 
 def parse_bbox(value: str) -> tuple[float, float, float, float]:
-    """Parse and validate a west,south,east,north bounding-box argument."""
+    """Convert `west,south,east,north` text into bounds DuckDB can filter against."""
     try:
         west, south, east, north = (float(part) for part in value.split(","))
     except ValueError as error:
@@ -29,7 +29,7 @@ def parse_bbox(value: str) -> tuple[float, float, float, float]:
 
 
 def latest_release(stac_catalog: str) -> str:
-    """Fetch the latest Overture release identifier from its STAC catalog."""
+    """Ask Overture's STAC catalog which data release is current."""
     response = requests.get(stac_catalog, timeout=60)
     response.raise_for_status()
     payload = response.json()
@@ -40,7 +40,7 @@ def latest_release(stac_catalog: str) -> str:
 
 
 def place_assets(release: str) -> list[str]:
-    """Return GeoParquet asset URLs for an Overture Places release."""
+    """Find cloud-hosted GeoParquet files that contain Places for one release."""
     collection = requests.get(OVERTURE_PLACE_COLLECTION_URL.format(release=release), timeout=60).json()
     item_urls = [link.get("href") for link in collection.get("links", []) if link.get("rel") == "item"]
     assets: list[str] = []
@@ -66,7 +66,12 @@ def read_places(
     maximum_records: int | None,
     memory_limit: str,
 ) -> list[dict[str, object]]:
-    """Query Overture GeoParquet data and map matching rows to index records."""
+    """Read matching places and map Overture fields into the index record format.
+
+    The query keeps named records above the confidence threshold, then applies
+    optional country and bounding-box filters. A record's point is taken from
+    the lower-left coordinate in its Overture bounding box.
+    """
     connection = duckdb.connect()
     ca_cert_file = os.environ.get("DUCKDB_CA_CERT_FILE")
     if ca_cert_file:
@@ -102,6 +107,10 @@ def read_places(
             addresses[1].country AS country,
             CAST(bbox.xmin AS DOUBLE) AS longitude,
             CAST(bbox.ymin AS DOUBLE) AS latitude,
+            CAST(bbox.xmin AS DOUBLE) AS bounds_west,
+            CAST(bbox.ymin AS DOUBLE) AS bounds_south,
+            CAST(bbox.xmax AS DOUBLE) AS bounds_east,
+            CAST(bbox.ymax AS DOUBLE) AS bounds_north,
             CAST(confidence AS DOUBLE) AS confidence
         FROM read_parquet(?)
         WHERE {' AND '.join(predicates)}
@@ -111,8 +120,9 @@ def read_places(
         [source, *parameters],
     ).fetchall()
     columns = [column[0] for column in connection.description]
-    return [
-        {
+    records = []
+    for row in rows:
+        record = {
             "NAME1": row[columns.index("name")],
             "TYPE": row[columns.index("basic_category")],
             "LOCALITY": row[columns.index("locality")],
@@ -122,12 +132,24 @@ def read_places(
             "LONGITUDE": row[columns.index("longitude")],
             "LATITUDE": row[columns.index("latitude")],
         }
-        for row in rows
-    ]
+        bounds = [
+            row[columns.index("bounds_west")],
+            row[columns.index("bounds_south")],
+            row[columns.index("bounds_east")],
+            row[columns.index("bounds_north")],
+        ]
+        if all(value is not None for value in bounds):
+            record["bbox"] = bounds
+        records.append(record)
+    return records
 
 
 def main() -> int:
-    """Build a static prefix index from an Overture Places release or input file."""
+    """Load a selected or current Overture release and write an Overture-only index.
+
+    Use `--input` to read local or custom Parquet data instead of discovering the
+    latest cloud release. The output directory is replaced after a successful build.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", help="Parquet file, glob, or URL; defaults to the latest public Overture Places release")
     parser.add_argument("--release", help="Overture release identifier; defaults to the latest STAC release")

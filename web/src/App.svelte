@@ -10,8 +10,13 @@
 
   import { toggle, move, resultMeta } from "./lib/utils.js";
 
+  const indexBaseUrl = import.meta.env.VITE_NAME_INDEX_BASE_URL || (
+    import.meta.env.DEV
+      ? "/data"
+      : new URL("../data", window.location.href).href
+  );
   const index = createNameIndex({
-    baseUrl: new URL("data", window.location.href).href,
+    baseUrl: indexBaseUrl,
     sourcePriority: ["OS Open Names", "Overture Places"],
   });
 
@@ -22,32 +27,32 @@
   let searchTimer;
   let activeRequest;
   let availableSources = ["OS Open Names", "Overture Places"];
-  let typesBySource = {};
-  let typeLabelsBySource = {};
+  let categoriesBySource = {};
+  let categoryLabelsBySource = {};
   let selectedSources = [...availableSources];
-  let selectedTypes = [];
+  let selectedCategories = [];
 
-  /** Count displayed records by normalized name for duplicate disambiguation. */
+  /** Count identical displayed names so repeated results can show more context. */
   $: resultNameCounts = results.reduce((counts, record) => {
-    const normalizedName = record.NAME1.toLowerCase();
+    const normalizedName = record.name.toLowerCase();
     counts.set(normalizedName, (counts.get(normalizedName) ?? 0) + 1);
     return counts;
   }, new Map());
 
-  /** Count records by shared place context for coordinate disambiguation. */
+  /** Count records with the same locality and region to decide when coordinates help. */
   $: resultContextCounts = results.reduce((counts, record) => {
-    const context = [record.NAME1, record.LOCALITY, record.POSTCODE_DISTRICT, record.REGION].join("|").toLowerCase();
+    const context = [record.name, record.locality, record.postcodeDistrict, record.region].join("|").toLowerCase();
     counts.set(context, (counts.get(context) ?? 0) + 1);
     return counts;
   }, new Map());
 
-  /** Load source and type refinements published in the index manifest. */
+  /** Load the available filter choices from the manifest before the user searches. */
   async function loadMetadata() {
     try {
       const manifest = await index.metadata();
       availableSources = manifest.sources;
-      typesBySource = manifest.typesBySource ?? Object.fromEntries(manifest.sources.map((source) => [source, manifest.types ?? []]));
-      typeLabelsBySource = manifest.typeLabelsBySource ?? {};
+      categoriesBySource = manifest.categoriesBySource ?? Object.fromEntries(manifest.sources.map((source) => [source, manifest.categories ?? []]));
+      categoryLabelsBySource = manifest.categoryLabelsBySource ?? {};
       selectedSources = [...manifest.sources];
     } catch {
       status = "The index settings could not be loaded.";
@@ -57,55 +62,55 @@
   onMount(loadMetadata);
 
   /**
-   * Formats enough record context to distinguish similarly named places.
+    * Builds the short context line shown beneath each result name.
    *
    * @param {Record<string, string | number | undefined>} record - Search result to describe.
    * @returns {string} Display metadata for the result.
    */
   function formatMeta(record) {
-    return resultMeta(record, typesBySource, typeLabelsBySource, resultNameCounts, resultContextCounts);
+    return resultMeta(record, categoryLabelsBySource, resultNameCounts, resultContextCounts);
   }
 
   /**
-   * Makes a result the current selection and clears the active result list.
+    * Opens a result's details and uses its name as the current search text.
    *
    * @param {Record<string, string | number | undefined>} record - Chosen search result.
    */
   function select(record) {
-    query = record.NAME1;
+    query = record.name;
     results = [];
     selected = record;
     status = "Place selected.";
   }
 
-  /** Schedules a new search when the current query is long enough. */
+  /** Re-run the current query after a source or category filter changes. */
   function refreshSearch() {
     if (query.trim().length >= 3) scheduleSearch();
   }
 
   /**
-   * Toggles a source refinement and removes types unavailable from its sources.
+    * Changes the source filter and drops selected categories that no longer apply.
    *
    * @param {string} source - Source to toggle.
    */
   function changeSources(source) {
     selectedSources = toggle(selectedSources, source);
-    const allowedTypes = new Set(selectedSources.flatMap((selectedSource) => typesBySource[selectedSource] ?? []));
-    selectedTypes = selectedTypes.filter((type) => allowedTypes.has(type));
+    const allowedCategories = new Set(selectedSources.flatMap((selectedSource) => categoriesBySource[selectedSource] ?? []));
+    selectedCategories = selectedCategories.filter((category) => allowedCategories.has(category));
     refreshSearch();
   }
 
   /**
-   * Toggles a type refinement and schedules a new search.
+    * Changes the category filter and schedules the current query again.
    *
-   * @param {string} type - Type to toggle.
+   * @param {string} category - Category to toggle.
    */
-  function changeTypes(type) {
-    selectedTypes = toggle(selectedTypes, type);
+  function changeCategories(category) {
+    selectedCategories = toggle(selectedCategories, category);
     refreshSearch();
   }
 
-  /** Debounces a search, cancelling stale requests and handling empty refinements. */
+  /** Wait briefly between keystrokes, and stop searches that no longer apply. */
   function scheduleSearch() {
     clearTimeout(searchTimer);
     selected = undefined;
@@ -125,7 +130,7 @@
   }
 
   /**
-   * Retrieves and renders the current query's matching records.
+    * Fetches matching records, ignores stale responses, and updates the result status.
    *
    * @param {string} searchQuery - Trimmed query captured when the search was scheduled.
    * @returns {Promise<void>}
@@ -134,22 +139,24 @@
     activeRequest?.abort();
     activeRequest = new AbortController();
     status = "Searching index...";
+    const searchStartedAt = performance.now();
     try {
       const matches = await index.search(searchQuery, {
         signal: activeRequest.signal,
         sources: selectedSources,
-        types: selectedTypes.length ? selectedTypes : undefined,
+        categories: selectedCategories.length ? selectedCategories : undefined,
         sourcePriority: selectedSources,
-        typePriority: selectedTypes,
+        categoryPriority: selectedCategories,
       });
       if (query.trim() !== searchQuery) return;
+      const searchDuration = Math.round(performance.now() - searchStartedAt);
       results = matches.slice(0, 12);
       if (!matches.length) {
-        status = "No matching places.";
+        status = `No matching places · ${searchDuration} ms`;
       } else if (matches.moreAvailable) {
-        status = `Showing first ${results.length} · keep typing to narrow`;
+        status = `Showing first ${results.length} · keep typing to narrow · ${searchDuration} ms`;
       } else {
-        status = `${matches.length} matches`;
+        status = `${matches.length} matches · ${searchDuration} ms`;
       }
     } catch (error) {
       if (error.name !== "AbortError") {
@@ -167,76 +174,19 @@
     <p class="intro">Search names for roads, postcodes, geographic features, settlements, and local points of interest.</p>
   </header>
 
-  <SearchInput {query} {status} onInput={scheduleSearch} />
+  <SearchInput bind:query {status} onInput={scheduleSearch} />
   <SearchResults {results} onSelect={select} {formatMeta} />
   <RefinementPanel
     {availableSources}
     {selectedSources}
-    {typesBySource}
-    {typeLabelsBySource}
-    {selectedTypes}
+    {categoriesBySource}
+    {categoryLabelsBySource}
+    {selectedCategories}
     onSourceChange={changeSources}
-    onTypeChange={changeTypes}
+    onCategoryChange={changeCategories}
     onSourceMove={(index, direction) => { selectedSources = move(selectedSources, index, direction); refreshSearch(); }}
-    onTypeMove={(index, direction) => { selectedTypes = move(selectedTypes, index, direction); refreshSearch(); }}
+    onCategoryMove={(index, direction) => { selectedCategories = move(selectedCategories, index, direction); refreshSearch(); }}
   />
   <SelectedPlace {selected} />
   <LibraryInfo />
 </main>
-
-<style>
-  :global(*) {
-    box-sizing: border-box;
-  }
-
-  :global(body) {
-    margin: 0;
-    min-width: 320px;
-    color: #18231f;
-    background: #edf3eb;
-    font-family: Georgia, "Times New Roman", serif;
-  }
-
-  main {
-    width: min(100% - 32px, 680px);
-    margin: 0 auto;
-    padding: 12vh 0 64px;
-  }
-
-  header {
-    margin-bottom: 36px;
-  }
-
-  h1 {
-    margin-top: 0;
-    margin-bottom: 8px;
-    font-size: clamp(2.4rem, 7vw, 4.5rem);
-    font-weight: 400;
-    line-height: 0.95;
-  }
-
-  .eyebrow {
-    margin: 0 0 8px;
-    color: #557160;
-    font-family: ui-sans-serif, system-ui, sans-serif;
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .intro {
-    max-width: 37rem;
-    margin-top: 0;
-    margin-bottom: 16px;
-    color: #52625a;
-    font-size: 1.1rem;
-    line-height: 1.55;
-  }
-
-  @media (max-width: 480px) {
-    main {
-      padding-top: 8vh;
-    }
-  }
-</style>

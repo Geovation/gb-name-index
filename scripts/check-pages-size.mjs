@@ -8,10 +8,10 @@ const maximumFileBytes = 95 * 1024 * 1024
 if (!directory) throw new Error('Provide the published index directory')
 
 /**
- * Recursively collects every file size below a directory.
+ * Measure the supplied directory to check it against the Pages publishing limits.
  *
- * @param {string} path - Directory to measure.
- * @returns {Promise<{total: number, files: Array<{path: string, size: number}>}>} Aggregate size and file details.
+ * @param {string} path - Directory to inspect, including its nested folders.
+ * @returns {Promise<{total: number, files: Array<{path: string, size: number}>}>} Total bytes and each file's size.
  */
 async function measure (path) {
   let total = 0

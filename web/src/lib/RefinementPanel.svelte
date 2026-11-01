@@ -1,33 +1,34 @@
 <script>
   import { ArrowDown, ArrowUp } from "@lucide/svelte";
+  import { selectedCategoryLabel } from "./utils.js";
 
-  /** Sources, types, and callbacks used to refine and rank search results. */
+  /** Filter choices and callbacks; the parent app owns their selected values. */
   export let availableSources = [];
   export let selectedSources = [];
-  export let typesBySource = {};
-  export let typeLabelsBySource = {};
-  export let selectedTypes = [];
+  export let categoriesBySource = {};
+  export let categoryLabelsBySource = {};
+  export let selectedCategories = [];
   export let onSourceChange = () => {};
-  export let onTypeChange = () => {};
+  export let onCategoryChange = () => {};
   export let onSourceMove = () => {};
-  export let onTypeMove = () => {};
+  export let onCategoryMove = () => {};
 
-  let typeQuery = "";
+  let categoryQuery = "";
 
   /**
-   * Resolves a source-specific display label for a type identifier.
+    * Shows the source's category label, with a readable fallback.
    *
    * @param {string} source - Source that defines the type.
-   * @param {string} type - Type identifier to label.
-   * @returns {string} User-facing type label.
+   * @param {string} category - Category identifier to label.
+   * @returns {string} User-facing category label.
    */
-  function typeLabel(source, type) {
-    if (!type) return type;
-    return typeLabelsBySource[source]?.[type] ?? formatLabel(type);
+  function categoryLabel(source, category) {
+    if (!category) return category;
+    return categoryLabelsBySource[source]?.[category] ?? formatLabel(category);
   }
 
   /**
-   * Converts an underscore-separated identifier to a display label.
+    * Makes an unlabelled identifier readable in the filter list.
    *
    * @param {string} label - Identifier to format.
    * @returns {string} Formatted label.
@@ -36,10 +37,10 @@
     return label ? label.replaceAll("_", " ") : label;
   }
 
-  /** Groups source types after filtering them against the current type query. */
-  $: visibleTypeGroups = selectedSources.map((source) => ({
+  /** Show only the selected sources' categories that match the filter text. */
+  $: visibleCategoryGroups = selectedSources.map((source) => ({
     source,
-    types: (typesBySource[source] ?? []).filter((type) => typeLabel(source, type).toLowerCase().includes(typeQuery.trim().toLowerCase())),
+    categories: (categoriesBySource[source] ?? []).filter((category) => categoryLabel(source, category).toLowerCase().includes(categoryQuery.trim().toLowerCase())),
   }));
 </script>
 
@@ -69,148 +70,34 @@
     {/if}
   </section>
 
-  <section class="refinement-group" aria-labelledby="type-heading">
-    <h2 id="type-heading">Types</h2>
-    <input class="type-filter" type="search" bind:value={typeQuery} placeholder="Filter types" aria-label="Filter types" />
-    <div class="type-choices">
-      {#each visibleTypeGroups as group}
-        <section class="type-source-group" aria-label={`${group.source} types`}>
+  <section class="refinement-group" aria-labelledby="category-heading">
+    <h2 id="category-heading">Categories</h2>
+    <input class="category-filter" type="search" bind:value={categoryQuery} placeholder="Filter categories" aria-label="Filter categories" />
+    <div class="category-choices">
+      {#each visibleCategoryGroups as group}
+        <section class="category-source-group" aria-label={`${group.source} categories`}>
           <h3>{group.source}</h3>
           <div class="choices">
-            {#each group.types as type}
+            {#each group.categories as category}
               <label class="choice">
-                <input type="checkbox" checked={selectedTypes.includes(type)} onchange={() => onTypeChange(type)} />
-                <span>{typeLabel(group.source, type)}</span>
+                <input type="checkbox" checked={selectedCategories.includes(category)} onchange={() => onCategoryChange(category)} />
+                <span>{categoryLabel(group.source, category)}</span>
               </label>
             {/each}
           </div>
         </section>
       {/each}
     </div>
-    {#if selectedTypes.length}
-      <ol class="priority-list" aria-label="Type priority">
-        {#each selectedTypes as type, index}
+    {#if selectedCategories.length}
+      <ol class="priority-list" aria-label="Category priority">
+        {#each selectedCategories as category, index}
           <li>
-            <span>{formatLabel(type)}</span>
-            <button class="priority-button" type="button" aria-label={`Move ${type} up`} disabled={index === 0} onclick={() => onTypeMove(index, -1)}><ArrowUp size={15} /></button>
-            <button class="priority-button" type="button" aria-label={`Move ${type} down`} disabled={index === selectedTypes.length - 1} onclick={() => onTypeMove(index, 1)}><ArrowDown size={15} /></button>
+            <span>{selectedCategoryLabel(category, selectedSources, categoriesBySource, categoryLabelsBySource)}</span>
+            <button class="priority-button" type="button" aria-label={`Move ${category} up`} disabled={index === 0} onclick={() => onCategoryMove(index, -1)}><ArrowUp size={15} /></button>
+            <button class="priority-button" type="button" aria-label={`Move ${category} down`} disabled={index === selectedCategories.length - 1} onclick={() => onCategoryMove(index, 1)}><ArrowDown size={15} /></button>
           </li>
         {/each}
       </ol>
     {/if}
   </section>
 </details>
-
-<style>
-  .refinements {
-    margin-top: 18px;
-    border-top: 1px solid #b9c9bb;
-    color: #52625a;
-    font-family: ui-sans-serif, system-ui, sans-serif;
-    padding-top: 14px;
-  }
-
-  summary {
-    cursor: pointer;
-    font-size: 0.875rem;
-    font-weight: 700;
-  }
-
-  .refinement-group {
-    margin-top: 20px;
-  }
-
-  .refinement-group h2 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    font-size: 1rem;
-  }
-
-  .choices {
-    display: grid;
-    gap: 6px;
-  }
-
-  .type-choices {
-    max-height: 180px;
-    overflow-y: auto;
-    padding-right: 8px;
-  }
-
-  .type-source-group + .type-source-group {
-    margin-top: 16px;
-  }
-
-  .type-source-group h3 {
-    margin: 0 0 8px;
-    color: #557160;
-    font-size: 0.8rem;
-  }
-
-  .choice {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0;
-    color: #18231f;
-    font-size: 0.875rem;
-    font-weight: 400;
-  }
-
-  .choice input {
-    width: 16px;
-    height: 16px;
-    margin: 0;
-    padding: 0;
-  }
-
-  .type-filter {
-    width: 100%;
-    margin-bottom: 10px;
-    padding: 8px 10px;
-    font-size: 0.875rem;
-    border: 1px solid #83998a;
-    border-radius: 4px;
-    background: #fffefa;
-  }
-
-  .type-filter:focus {
-    border-color: #1d5a3b;
-    outline: 3px solid #b9dac1;
-    outline-offset: 2px;
-  }
-
-  .priority-list {
-    display: grid;
-    gap: 4px;
-    margin: 12px 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .priority-list li {
-    display: grid;
-    grid-template-columns: 1fr 30px 30px;
-    align-items: center;
-    border-top: 1px solid #d6e0d6;
-    padding: 7px 0;
-    font-size: 0.8rem;
-  }
-
-  .priority-button {
-    display: grid;
-    width: 28px;
-    height: 28px;
-    place-items: center;
-    border: 1px solid #83998a;
-    border-radius: 4px;
-    background: #fffefa;
-    color: #1d5a3b;
-    cursor: pointer;
-  }
-
-  .priority-button:disabled {
-    cursor: default;
-    opacity: 0.4;
-  }
-</style>

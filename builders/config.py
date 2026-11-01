@@ -1,29 +1,40 @@
-"""Configuration for GB Name Index builders."""
+"""Shared source names, record fields, and build rules for the index builders."""
 
-# Product names
+# Names used in generated manifests and source filters.
 OS_OPEN_NAMES_PRODUCT_NAME = "OS Open Names"
 OVERTURE_PLACES_PRODUCT_NAME = "Overture Places"
 GB_NAME_INDEX_PRODUCT_NAME = "Great Britain Name Index"
 
-# Data sources
+# Public endpoints used to discover source releases and downloads.
 OS_OPEN_NAMES_DOWNLOAD_URL = "https://api.os.uk/downloads/v1/products/OpenNames/downloads?area=GB&format=CSV&redirect"
 OVERTURE_STAC_CATALOG = "https://stac.overturemaps.org/catalog.json"
 OVERTURE_PLACE_COLLECTION_URL = "https://stac.overturemaps.org/{release}/places/place/collection.json"
 
-# Index tuning
+# Coarse GB envelope to prune remote Overture row groups before the exact country filter.
+GB_BOUNDS = (-9.0, 49.0, 2.0, 61.0)
+
+# Keep ordinary files small enough for quick prefix searches.
 MINIMUM_SHARD_LENGTH = 3
 MAXIMUM_SHARD_BYTES = 64 * 1024
 MAXIMUM_RESULTS_PER_SHARD = 50
 COORDINATE_DECIMAL_PLACES = 5
 
-# Record schema
-RECORD_FIELDS = ("NAME1", "TYPE", "LOCAL_TYPE", "LOCALITY", "POSTCODE_DISTRICT", "REGION", "LONGITUDE", "LATITUDE", "SOURCE")
+# User-facing names and their source-builder keys, in compact-row order.
+RECORD_FIELDS = ("name", "category", "subtype", "locality", "postcodeDistrict", "region", "longitude", "latitude", "bbox", "source")
+SOURCE_RECORD_FIELDS = ("NAME1", "TYPE", "LOCAL_TYPE", "LOCALITY", "POSTCODE_DISTRICT", "REGION", "LONGITUDE", "LATITUDE", "bbox", "SOURCE")
+RECORD_DICTIONARIES = {
+    "category": "categories",
+    "subtype": "subtypes",
+    "locality": "localities",
+    "postcodeDistrict": "postcodeDistricts",
+    "region": "regions",
+    "source": "sources",
+}
 SOURCES = ("OS Open Names", "Overture Places")
 
-# Catalog of every category each source can contribute.
-# This is the pick-and-mix list: the caller chooses which categories to include,
-# while the default values below establish the shipping defaults.
-SOURCE_TYPE_CATALOG = {
+# OS categories are exhaustive. Overture labels cover common basic categories;
+# newly introduced Overture categories are accepted by the builder by default.
+SOURCE_CATEGORY_CATALOG = {
     "OS Open Names": {
         "hydrography": "Water features",
         "landcover": "Land cover",
@@ -63,9 +74,10 @@ SOURCE_TYPE_CATALOG = {
     },
 }
 
-# Defaults for the shipping build. Set a value to False to exclude a category
-# even when it is available from the source.
-SOURCE_TYPE_DEFAULTS = {
+OS_OPEN_NAMES_CATEGORY_LABELS = SOURCE_CATEGORY_CATALOG["OS Open Names"]
+
+# Categories set to False are left out of the default combined build.
+SOURCE_CATEGORY_DEFAULTS = {
     "OS Open Names": {
         "hydrography": True,
         "landcover": True,
@@ -105,9 +117,8 @@ SOURCE_TYPE_DEFAULTS = {
     },
 }
 
-# Separate policy for source overlap: these are categories that are already
-# supplied by OS Open Names and should be excluded from Overture even when the
-# Overture type is otherwise enabled by the defaults.
+# Overture categories already covered by OS Open Names. They are skipped unless
+# the build explicitly includes that type.
 OVERTURE_OVERLAP_CATEGORIES = {
     "air_transport_facility_or_service",
     "airport",

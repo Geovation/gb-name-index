@@ -2,7 +2,7 @@ import { cp, mkdir } from 'node:fs/promises'
 import { build as buildClient } from 'esbuild'
 import { build as buildSite } from 'vite'
 
-/** Shared esbuild options for each distributable client format. */
+/** Keep all client formats minified and compatible with the same JS target. */
 const options = {
   bundle: true,
   entryPoints: ['src/index.js'],
@@ -32,3 +32,4 @@ await buildSite({
 
 await mkdir('build/harness-preview/client', { recursive: true })
 await cp('dist', 'build/harness-preview/client', { recursive: true })
+await cp('ATTRIBUTION.md', 'build/harness-preview/client/ATTRIBUTION.md')

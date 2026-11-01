@@ -1,12 +1,34 @@
 name: Update GB Name Index
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/update-places.yml'
+      - 'ATTRIBUTION.md'
+      - '_config.yml'
+      - '_includes/**'
+      - 'LICENSE'
+      - 'README.md'
+      - 'assets/**'
+      - 'builders/**'
+      - 'docs/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'requirements.txt'
+      - 'scripts/**'
+      - 'src/**'
+      - 'web/**'
+      - 'tests/**'
   schedule:
     - cron: "0 6 1 * *"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: publish-places-index
@@ -15,6 +37,9 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -28,39 +53,42 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Install JavaScript dependencies
         run: npm ci
+      - name: Test JavaScript client
+        run: npm test
+      - name: Test Python builders
+        run: python -m unittest discover -s tests -p 'test_*.py'
       - name: Build JavaScript client
         run: npm run build
       - name: Build unified name index
-        run: python build_places_index.py
+        run: python -m builders.build_places_index
       - name: Check GitHub Pages size limits
         run: npm run check-pages-size
-      - name: Publish name index
-        env:
-          GH_TOKEN: ${{ github.token }}
-          COMMIT_NAME: ${{ github.actor }}
-          COMMIT_ID: ${{ github.actor_id }}
+      - name: Prepare Jekyll source
         run: |
-          mkdir published
-          cd published
-          git init
-          git remote add origin "https://github.com/${{ github.repository }}.git"
-          git -c http.extraheader="AUTHORIZATION: bearer ${GH_TOKEN}" fetch origin gh-pages:gh-pages || true
-          if git show-ref --verify --quiet refs/heads/gh-pages; then
-            git checkout gh-pages
-          else
-            git checkout --orphan gh-pages
-          fi
-          git rm -rf data client index.html assets app.js site.css || true
-          mkdir -p data
-          cp -R ../build/data/. data/
-          cp -R ../build/harness-preview/. .
-          git config user.name "${COMMIT_NAME}"
-          git config user.email "${COMMIT_ID}+${COMMIT_NAME}@users.noreply.github.com"
-          git add data client index.html assets
-          git diff --cached --quiet && exit 0
-          git checkout --orphan refreshed-gh-pages
-          git add -A
-          git commit -m "Update GB name index"
-          git branch -D gh-pages || true
-          git branch -m gh-pages
-          git -c http.extraheader="AUTHORIZATION: bearer ${GH_TOKEN}" push --force origin gh-pages
+          mkdir -p build/pages-source
+          cp README.md ATTRIBUTION.md LICENSE _config.yml build/pages-source/
+          cp -R _includes assets docs build/pages-source/
+          cp web/docs.css web/jekyll-mermaid.js build/pages-source/
+          mkdir -p build/pages-source/fonts
+          cp node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2 build/pages-source/fonts/
+          cp node_modules/@fontsource-variable/manrope/LICENSE build/pages-source/fonts/LICENSE
+      - uses: actions/configure-pages@v5
+      - name: Build Markdown site with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: build/pages-source
+          destination: build/pages-site
+      - name: Add generated index, harness, and client
+        run: |
+          mkdir -p build/pages-site/data build/pages-site/client build/pages-site/harness build/pages-site/assets
+          cp -R build/data/. build/pages-site/data/
+          cp -R dist/. build/pages-site/client/
+          cp ATTRIBUTION.md build/pages-site/client/
+          cp -R build/harness-preview/harness/. build/pages-site/harness/
+          cp -R build/harness-preview/assets/. build/pages-site/assets/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/pages-site
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
