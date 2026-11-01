@@ -25,7 +25,7 @@ Set the repository's Pages source to **GitHub Actions**. Jekyll renders `README.
 /
   index.html                 Home page rendered from README.md
   docs/                      Jekyll-rendered component guides
-  assets/                    Minima theme and compiled harness files
+  assets/                    Cayman theme and compiled harness files
   data/                      Current index manifest and shards
   client/                    Latest ESM, CommonJS, and browser bundles
   harness/index.html         Interactive search harness

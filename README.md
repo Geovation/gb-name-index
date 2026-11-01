@@ -6,6 +6,8 @@ Results use plain JavaScript objects with readable lower-camel-case fields such 
 
 Use the tiny JavaScript client and public index directly from your browser app. There is no API key, service fee, backend, or index hosting to set up; your app only needs an internet connection.
 
+[Open the search harness](harness/) to try the index in your browser.
+
 ## Install a tagged client
 
 Install from a GitHub release tag using npm:
@@ -63,7 +65,7 @@ flowchart LR
 - [Manrope](https://fonts.google.com/specimen/Manrope) via [Fontsource](https://fontsource.org/) — self-hosted open variable font.
 - [Lucide](https://lucide.dev/) — source/category ordering icons.
 - [esbuild](https://esbuild.github.io/) — ESM, CommonJS, and browser bundles.
-- [Jekyll](https://jekyllrb.com/) with [Minima](https://github.com/jekyll/minima) — render and navigate project documentation.
+- [Jekyll](https://jekyllrb.com/) with [Cayman](https://github.com/pages-themes/cayman) — render project documentation.
 - [Mermaid](https://mermaid.js.org/) — diagrams in project documentation.
 - [GitHub Actions](https://github.com/features/actions) — tests, data rebuilds, and releases.
 

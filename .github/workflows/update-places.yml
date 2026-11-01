@@ -71,9 +71,9 @@ jobs:
           cp ATTRIBUTION.md build/pages-source/_includes/attribution.md
           cp LICENSE build/pages-source/_includes/license.md
           cp web/docs.css web/jekyll-mermaid.js build/pages-source/
-          mkdir -p build/pages-source/fonts
-          cp node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2 build/pages-source/fonts/
-          cp node_modules/@fontsource-variable/manrope/LICENSE build/pages-source/fonts/LICENSE
+          mkdir -p build/pages-source/assets/fonts
+          cp node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2 build/pages-source/assets/fonts/
+          cp node_modules/@fontsource-variable/manrope/LICENSE build/pages-source/assets/fonts/LICENSE
       - uses: actions/configure-pages@v5
       - name: Build Markdown site with Jekyll
         uses: actions/jekyll-build-pages@v1

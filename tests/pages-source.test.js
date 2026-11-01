@@ -19,25 +19,27 @@ test('Jekyll source uses GitHub Pages plugins for README and Markdown links', as
   const packageJson = JSON.parse(await readFile('package.json', 'utf8'))
   const buildScript = await readFile('scripts/build.mjs', 'utf8')
 
-  assert.match(config, /theme:\s*minima/)
+  assert.match(config, /theme:\s*jekyll-theme-cayman/)
   assert.match(config, /jekyll-readme-index/)
   assert.match(config, /jekyll-relative-links/)
   assert.match(config, /remove_originals:\s*true/)
   assert.equal(packageJson.devDependencies.marked, undefined)
   assert.doesNotMatch(buildScript, /build-docs|buildDocumentation/)
 
-  const stylesheet = await readFile('assets/main.scss', 'utf8')
+  const stylesheet = await readFile('assets/css/style.scss', 'utf8')
   assert.equal((stylesheet.match(/^---$/gm) ?? []).length, 2)
-  assert.equal((stylesheet.match(/@import "minima";/g) ?? []).length, 1)
+  assert.equal((stylesheet.match(/@import "{{ site\.theme }}";/g) ?? []).length, 1)
+  assert.match(stylesheet, /\.main-content > h1:first-of-type\s*\{\s*display:\s*none/)
+  assert.match(stylesheet, /\.site-footer-owner\s*\{\s*display:\s*none/)
 
-  const head = await readFile('_includes/head.html', 'utf8')
-  assert.equal((head.match(/<head>/g) ?? []).length, 1)
+  const head = await readFile('_includes/head-custom.html', 'utf8')
   assert.match(head, /jekyll-mermaid\.js/)
-  assert.doesNotMatch(head, /docs\.js/)
+  assert.match(head, /docs\.css/)
 
   const workflow = await readFile('.github/workflows/update-places.yml', 'utf8')
   assert.match(workflow, /actions\/jekyll-build-pages@v1/)
   assert.match(workflow, /web\/docs\.css web\/jekyll-mermaid\.js/)
+  assert.match(workflow, /build\/pages-source\/assets\/fonts/)
   assert.match(workflow, /cp ATTRIBUTION\.md build\/pages-source\/_includes\/attribution\.md/)
   assert.match(workflow, /cp LICENSE build\/pages-source\/_includes\/license\.md/)
   assert.match(workflow, /sudo chown -R "\$\(id -u\):\$\(id -g\)" build\/pages-site/)
@@ -48,6 +50,9 @@ test('Jekyll source uses GitHub Pages plugins for README and Markdown links', as
   assert.match(attributionPage, /{% include attribution\.md %}/)
   assert.match(licensePage, /{% include license\.md %}/)
   assert.doesNotMatch(`${attributionPage}\n${licensePage}`, /include_relative \.\.\//)
+
+  const readme = await readFile('README.md', 'utf8')
+  assert.match(readme, /\[Open the search harness\]\(harness\/\)/)
 
   for (const [path, title] of pages) {
     const markdown = await readFile(path, 'utf8')
