@@ -1,39 +1,26 @@
 # GB Name Index
 
-GB Name Index makes two complementary open datasets easier to use together. OS Open Names provides Great Britain place names, roads, settlements, and postcodes; Overture Places adds named businesses, landmarks, and points of interest. The project converts selected records into one searchable structure while preserving their sources.
+GB Name Index combines OS Open Names and Overture Places into one searchable index of names across Great Britain. Records keep their source information and use a shared, readable format.
 
-Results use plain JavaScript objects with readable lower-camel-case fields such as `name`, `locality`, `longitude`, and `source`. Each result has one display name rather than exposing source-specific alternate name fields.
-
-Use the tiny JavaScript client and public index directly from your browser app. There is no API key, service fee, backend, or index hosting to set up; your app only needs an internet connection.
+Use the JavaScript client and public index directly from a browser app. There is no API key, service fee, backend, or index hosting to set up.
 
 [Open the search harness](harness/) to try the index in your browser.
 
 ## Install a tagged client
 
-Install from a GitHub release tag using npm:
+Install a pinned client version from a GitHub release tag using npm:
 
 ```bash
 npm install @geovation/gb-name-index@github:Geovation/gb-name-index#v0.1.0
 ```
 
-Then import the client in your application:
-
-```js
-import { search } from "@geovation/gb-name-index";
-
-const places = await search("Baker Street");
-```
-
-Replace `v0.1.0` with the release tag you want to pin. npm fetches the code from GitHub and builds the client during installation; the package is not published to the npm registry. For a browser app that should not install a dependency, the latest ESM client is also available from GitHub Pages. See the [JavaScript client guide](docs/javascript-client.md).
+Replace `v0.1.0` with the release tag you want to use. The [JavaScript client guide](docs/javascript-client.md) shows how to search, filter, and use the browser bundle. The package is installed from GitHub rather than the npm registry.
 
 ## About
 
-The builders normalize names, convert coordinates to WGS 84, and map source-specific fields into shared name, type, location, and source fields. They filter categories already covered by the other source, but do not claim to resolve every duplicate place record.
+The builders select records from both sources, normalize names and coordinates, and filter configured category overlaps. They do not resolve every duplicate place. See [Data builders](docs/data-builders.md) for what is included and how the index is built.
 
-- **Data builders** download the source releases, select records, and write a compact prefix index.
-- **JavaScript client** searches those shards by name prefix, with source/category filters and ranking.
-- **Search harness** demonstrates search, filtering, and result selection in a browser.
-- **GitHub Pages** serves the docs, harness, latest client, and current index; tagged releases provide versioned client bundles.
+The client searches the published index by name prefix, and the [search harness](harness/) lets you try its filters and results in a browser. GitHub Pages hosts the documentation, harness, latest client, and current index.
 
 ```mermaid
 %% caption: Source releases become a tested data index, client, documentation site, and search harness.
@@ -80,9 +67,9 @@ npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite. To use another index, set `VITE_NAME_INDEX_BASE_URL` before starting Vite. The sample records are for testing only, not source data.
+Open the local URL printed by Vite. The harness uses sample records unless a local index has been built. See the [Search harness guide](docs/search-harness.md) for details.
 
-Run the tests and production build:
+Run the tests and build the client and harness:
 
 ```bash
 npm test
@@ -90,11 +77,11 @@ npm test
 npm run build
 ```
 
-To rebuild the full data index locally, run `.venv/bin/python -m builders.build_places_index`. This downloads the current source releases. The scheduled GitHub Actions workflow normally handles that rebuild and publication.
+To rebuild the full index locally, run `.venv/bin/python -m builders.build_places_index`. This downloads the latest source releases. See [Testing](docs/testing.md) for test coverage and [Build and size checks](docs/build-and-size-checks.md) for build outputs.
 
 ## Client versions
 
-Tagged releases provide versioned ESM, CommonJS, and browser-global bundles through both GitHub-tag npm dependencies and ZIP assets on [GitHub Releases](https://github.com/Geovation/gb-name-index/releases). The latest browser ESM client is also hosted at `https://geovation.github.io/gb-name-index/client/index.js`.
+Tagged releases provide versioned client bundles and ZIP downloads on [GitHub Releases](https://github.com/Geovation/gb-name-index/releases). The [JavaScript client guide](docs/javascript-client.md) covers the release and browser bundle options.
 
 ## Documentation
 
@@ -107,17 +94,15 @@ Tagged releases provide versioned ESM, CommonJS, and browser-global bundles thro
 
 ## Attribution
 
-Display the OS Open Names credit with the year for the data edition: **Contains OS data &copy; Crown copyright and database rights Ordnance Survey [year].** OS Open Names is available under the [Open Government Licence v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
-
-Credit Overture as **Overture Maps Foundation, overturemaps.org**. Places uses CDLA-Permissive 2.0 or Apache 2.0, depending on source. Check the current [Overture attribution guidance](https://docs.overturemaps.org/attribution/) and [Places licensing details](https://docs.overturemaps.org/guides/places/). The distributable notices are in [ATTRIBUTION.md](ATTRIBUTION.md).
+Apps that display index records must include source attribution. See [Attribution](docs/attribution.md) for the required wording and links, and [ATTRIBUTION.md](ATTRIBUTION.md) for distributable notices.
 
 ## Contributing
 
-Run the JavaScript and Python tests before opening a pull request. Changes to source, builders, or the client are also tested by GitHub Actions. See [Automation and releases](docs/automation-and-releases.md) for the workflow details.
+Run the JavaScript and Python tests before opening a pull request. See [Automation and releases](docs/automation-and-releases.md) for CI and publishing details.
 
 ## Versioning
 
-The package is kept private to the npm registry, but can be installed from a public GitHub tag. Push [Conventional Commits](https://www.conventionalcommits.org/) to `main` to open or update a release PR: `feat:` requests a minor release, `fix:` or `perf:` requests a patch, and a breaking change (`feat!:` or a `BREAKING CHANGE:` footer) requests a major release. Merge the PR to publish the versioned GitHub Release and client archive. Manual `vX.Y.Z` tags are also supported when the tag matches `package.json`.
+Push [Conventional Commits](https://www.conventionalcommits.org/) to `main` to request a release. The [release guide](docs/automation-and-releases.md#versioned-client-release) explains version bumps, release PRs, and manual tags.
 
 ## Authors
 
@@ -125,7 +110,7 @@ Geovation and the project contributors. See the [contributor history](https://gi
 
 ## License
 
-The project code is licensed under the [MIT License](docs/license.md). The source datasets have separate terms listed above and in [Attribution](docs/attribution.md).
+The project code is licensed under the [MIT License](docs/license.md). Source data has separate terms; see [Attribution](docs/attribution.md).
 
 ## Acknowledgments
 

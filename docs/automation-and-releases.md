@@ -17,7 +17,9 @@ The Pages rebuild and release workflows also run both test suites before publish
 
 ## GitHub Pages rebuild
 
-`.github/workflows/update-places.yml` runs monthly, on manual dispatch, and when relevant builder, client, docs, or harness files change on `main`. It builds the latest source data and bundles, checks data size, stages the Markdown and runtime assets, then uses GitHub's Jekyll build and Pages deployment actions.
+`.github/workflows/update-places.yml` publishes monthly, on manual dispatch, and when relevant source or documentation files change on `main`. It builds the client, tests the project, and publishes the full Pages site. The data index is rebuilt on schedule, when no recent cached copy is available, or when you force a refresh.
+
+On a manual run, select **Force index refresh** to rebuild the data even when a recent copy is cached. Otherwise, a cached index younger than 30 days is reused. Changes under `builders/` or to `requirements.txt` change the cache key and trigger a new build.
 
 Set the repository's Pages source to **GitHub Actions**. Jekyll renders `README.md` as the home page and the linked component guides as pages. Runtime assets are added alongside them:
 
@@ -31,7 +33,7 @@ Set the repository's Pages source to **GitHub Actions**. Jekyll renders `README.
   harness/index.html         Interactive search harness
 ```
 
-The workflow requests `pages: write` and `id-token: write` to deploy the Pages artifact.
+The workflow requests `pages: write` and `id-token: write` to deploy the Pages artifact. It does not push a `gh-pages` branch. Generated build output is ignored by Git, the workflow clears its Pages staging folders before each build, and the uploaded Pages artifact is retained for one day.
 
 ## Catalyst documentation export
 

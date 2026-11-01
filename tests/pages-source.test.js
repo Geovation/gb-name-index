@@ -43,7 +43,17 @@ test('Jekyll source uses GitHub Pages plugins for README and Markdown links', as
   assert.match(workflow, /cp ATTRIBUTION\.md build\/pages-source\/_includes\/attribution\.md/)
   assert.match(workflow, /cp LICENSE build\/pages-source\/_includes\/license\.md/)
   assert.match(workflow, /sudo chown -R "\$\(id -u\):\$\(id -g\)" build\/pages-site/)
+  assert.match(workflow, /actions\/cache\/restore@v4/)
+  assert.match(workflow, /actions\/cache\/save@v4/)
+  assert.match(workflow, /force_index_refresh/)
+  assert.match(workflow, /refreshed_at.*2592000/s)
+  assert.match(workflow, /rm -rf build\/pages-source build\/pages-site/)
+  assert.match(workflow, /retention-days: 1/)
   assert.match(workflow, /actions\/deploy-pages@v4/)
+
+  const gitignore = await readFile('.gitignore', 'utf8')
+  assert.match(gitignore, /\nbuild\/\n/)
+  assert.match(gitignore, /\ndist\//)
 
   const attributionPage = await readFile('docs/attribution.md', 'utf8')
   const licensePage = await readFile('docs/license.md', 'utf8')

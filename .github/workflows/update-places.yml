@@ -24,6 +24,12 @@ on:
   schedule:
     - cron: "0 6 1 * *"
   workflow_dispatch:
+    inputs:
+      force_index_refresh:
+        description: Rebuild the index even if a recent copy is available
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -59,10 +65,64 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_*.py'
       - name: Build JavaScript client
         run: npm run build
+      - name: Restore the latest built index
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            build/data
+            build/index-cache/refreshed-at
+          key: gb-name-index-${{ hashFiles('builders/**/*.py', 'requirements.txt') }}-${{ github.run_id }}
+          restore-keys: |
+            gb-name-index-${{ hashFiles('builders/**/*.py', 'requirements.txt') }}-
+      - name: Decide whether to rebuild the index
+        id: index-refresh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          FORCE_INDEX_REFRESH: ${{ github.event.inputs.force_index_refresh || 'false' }}
+        run: |
+          refresh=false
+          reason="A recent built index is available"
+          refreshed_at_file=build/index-cache/refreshed-at
+
+          if [[ "$EVENT_NAME" == "schedule" || "$FORCE_INDEX_REFRESH" == "true" ]]; then
+            refresh=true
+            reason="The schedule or manual force option requires a fresh index"
+          elif [[ ! -s build/data/index.json || ! -s "$refreshed_at_file" ]]; then
+            refresh=true
+            reason="No cached index is available"
+          else
+            refreshed_at=$(cat "$refreshed_at_file")
+            if ! [[ "$refreshed_at" =~ ^[0-9]+$ ]]; then
+              refresh=true
+              reason="The cached index timestamp is invalid"
+            elif (( $(date -u +%s) - refreshed_at >= 2592000 )); then
+              refresh=true
+              reason="The cached index is at least 30 days old"
+            fi
+          fi
+
+          echo "refresh=$refresh" >> "$GITHUB_OUTPUT"
+          echo "$reason"
       - name: Build unified name index
+        if: steps.index-refresh.outputs.refresh == 'true'
         run: python -m builders.build_places_index
+      - name: Record index refresh time
+        if: steps.index-refresh.outputs.refresh == 'true'
+        run: |
+          mkdir -p build/index-cache
+          date -u +%s > build/index-cache/refreshed-at
+      - name: Cache the refreshed index
+        if: steps.index-refresh.outputs.refresh == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            build/data
+            build/index-cache/refreshed-at
+          key: gb-name-index-${{ hashFiles('builders/**/*.py', 'requirements.txt') }}-${{ github.run_id }}
       - name: Check GitHub Pages size limits
         run: npm run check-pages-size
+      - name: Clear previous Pages output
+        run: rm -rf build/pages-source build/pages-site
       - name: Prepare Jekyll source
         run: |
           mkdir -p build/pages-source
@@ -93,6 +153,7 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build/pages-site
+          retention-days: 1
       - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
