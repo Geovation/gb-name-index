@@ -1,6 +1,6 @@
 {
   "name": "@geovation/gb-name-index",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Tiny client for the Great Britain name prefix index.",
   "private": true,
   "license": "MIT",
