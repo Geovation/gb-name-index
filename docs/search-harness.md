@@ -11,7 +11,7 @@ The harness demonstrates the public lookup: no API key, service fee, backend, or
 
 ## Run it locally
 
-Install the JavaScript development dependencies with `npm ci`, then run:
+Follow the [development guide](development.md) to install dependencies, then run:
 
 ```bash
 npm run dev

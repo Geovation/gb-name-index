@@ -9,12 +9,7 @@ The tests protect the promise that makes this project useful: two independently 
 
 ## Run locally
 
-Install the JavaScript and Python dependencies, then run:
-
-```bash
-npm test
-.venv/bin/python -m unittest discover -s tests -p 'test_*.py'
-```
+Set up the project and run both test suites using [Develop and run tests](development.md).
 
 The JavaScript tests use Node's built-in test runner and a fake `fetch` function. They cover query normalization, shard requests, ordering, filters, previews, truncation status, attribution exports, and cache clearing.
 

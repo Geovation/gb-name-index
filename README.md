@@ -1,119 +1,59 @@
 # GB Name Index
 
-GB Name Index combines OS Open Names and Overture Places into one searchable index of names across Great Britain. Records keep their source information and use a shared, readable format.
+GB Name Index combines OS Open Names and Overture Places into one searchable index of names across Great Britain. Use it through a small JavaScript client and a public static index. There is no API key, service fee, backend, or index hosting to set up.
 
-Use the JavaScript client and public index directly from a browser app. There is no API key, service fee, backend, or index hosting to set up.
+[![Tests](https://github.com/Geovation/gb-name-index/actions/workflows/test.yml/badge.svg)](https://github.com/Geovation/gb-name-index/actions/workflows/test.yml)
+[![Pages update](https://github.com/Geovation/gb-name-index/actions/workflows/update-places.yml/badge.svg)](https://github.com/Geovation/gb-name-index/actions/workflows/update-places.yml)
+[![MIT License](https://img.shields.io/github/license/Geovation/gb-name-index)](LICENSE)
 
-[Open the search harness](harness/) to try the index in your browser.
+[![GB Name Index search harness showing Baker Avenue results](docs/images/search-harness.png)](https://geovation.github.io/gb-name-index/harness/)
 
-## Install a tagged client
+## Install a client
 
-Install a pinned client version from a GitHub release tag using npm:
+Install a versioned client from a GitHub tag:
 
 ```bash
 npm install @geovation/gb-name-index@github:Geovation/gb-name-index#v0.1.0
 ```
 
-Replace `v0.1.0` with the release tag you want to use. The [JavaScript client guide](docs/javascript-client.md) shows how to search, filter, and use the browser bundle. The package is installed from GitHub rather than the npm registry.
+Replace `v0.1.0` with the release you want. The package is installed from GitHub, not the npm registry. See the [JavaScript client guide](docs/javascript-client.md) for browser and package examples.
 
 ## About
 
-The builders select records from both sources, normalize names and coordinates, and filter configured category overlaps. They do not resolve every duplicate place. See [Data builders](docs/data-builders.md) for what is included and how the index is built.
+The builders select records, normalize names and coordinates, and apply configured category rules. The client searches names by prefix and returns records with source details. Try it in the [search harness](harness/) or read [how the index is built](docs/data-builders.md).
 
-The client searches the published index by name prefix, and the [search harness](harness/) lets you try its filters and results in a browser. GitHub Pages hosts the documentation, harness, latest client, and current index.
+## Core technologies
 
-```mermaid
-%% caption: Source releases become a tested data index, client, documentation site, and search harness.
-flowchart LR
-  OS["OS Open Names<br/>Quarterly CSV"]
-  Overture["Overture Places<br/>Monthly GeoParquet"]
-  Changes["Schedule, manual run,<br/>or source or docs change"] -->|start workflow| Tests
-  subgraph Automation[GitHub Actions]
-    Tests["Run JavaScript and Python tests"] -->|tests pass| Build["Build index when needed; build client and harness"]
-  end
-  OS -->|quarterly CSV| Build
-  Overture -->|monthly GeoParquet| Build
-  Build -->|site files and index| Pages["GitHub Pages<br/>Cayman site"]
-  Pages -->|manifest and shards| Data["Current data<br/>/data/"]
-  Pages -->|ESM, CommonJS, browser bundles| Client["Latest client<br/>/client/"]
-  Pages -->|rendered Markdown| Docs["Project guides<br/>site root"]
-  Pages -->|compiled app| Harness["Search demo<br/>/harness/"]
-```
+- **Data:** Python, DuckDB, and pyproj.
+- **Client and harness:** JavaScript, Svelte, and Vite.
+- **Documentation and hosting:** Jekyll with the Cayman theme on GitHub Pages.
+- **Automation:** GitHub Actions tests and publishes the project.
 
-## Built With
+See [Technologies and licenses](docs/technologies-and-licenses.md) for the libraries, what each one does, and its license. Cayman gives the docs a ready-made responsive page layout and base styles; the project only adds its font and diagram styling.
 
-- [Python](https://www.python.org/) — data builders.
-- [Requests](https://requests.readthedocs.io/) — source downloads.
-- [DuckDB](https://duckdb.org/) — Overture GeoParquet queries.
-- [pyproj](https://pyproj4.github.io/pyproj/stable/) — coordinate conversion.
-- [Node.js](https://nodejs.org/) — JavaScript build and test runtime.
-- [npm](https://www.npmjs.com/) — install development dependencies and run project scripts.
-- [Svelte](https://svelte.dev/) — search harness components.
-- [Vite](https://vite.dev/) — local server and harness build.
-- [Pico CSS](https://picocss.com/) — classless browser-style baseline.
-- [Manrope](https://fonts.google.com/specimen/Manrope) via [Fontsource](https://fontsource.org/) — self-hosted open variable font.
-- [Lucide](https://lucide.dev/) — source/category ordering icons.
-- [esbuild](https://esbuild.github.io/) — ESM, CommonJS, and browser bundles.
-- [Jekyll](https://jekyllrb.com/) with [Cayman](https://github.com/pages-themes/cayman) — render project documentation.
-- [Mermaid](https://mermaid.js.org/) — diagrams in project documentation.
-- [GitHub Actions](https://github.com/features/actions) — tests, data rebuilds, and releases.
+## Develop and contribute
 
-## Develop locally
-
-To work on the project or run its search harness, install Node.js 24 and Git:
-
-```bash
-git clone https://github.com/Geovation/gb-name-index.git
-cd gb-name-index
-npm ci
-npm run dev
-```
-
-Open the local URL printed by Vite. The harness uses sample records unless a local index has been built. See the [Search harness guide](docs/search-harness.md) for details.
-
-Run the tests and build the client and harness:
-
-```bash
-npm test
-.venv/bin/python -m unittest discover -s tests -p 'test_*.py'
-npm run build
-```
-
-To rebuild the full index locally, run `.venv/bin/python -m builders.build_places_index`. This downloads the latest source releases. See [Testing](docs/testing.md) for test coverage and [Build and size checks](docs/build-and-size-checks.md) for build outputs.
+Fork the project to explore or contribute. The [development guide](docs/development.md) covers setup, the harness, tests, and builds.
 
 ## Client versions
 
-Tagged releases provide versioned client bundles and ZIP downloads on [GitHub Releases](https://github.com/Geovation/gb-name-index/releases). The [JavaScript client guide](docs/javascript-client.md) covers the release and browser bundle options.
+Versioned client bundles and ZIP downloads are available from [GitHub Releases](https://github.com/Geovation/gb-name-index/releases). See [how releases work](docs/automation-and-releases.md#versioned-client-release).
 
 ## Documentation
 
 - [Data builders](docs/data-builders.md): why the sources are combined, build options, and the shared index structure.
 - [JavaScript client](docs/javascript-client.md): search options, results, caching, and errors.
 - [Search harness](docs/search-harness.md): interface components and local development.
-- [Tests](docs/testing.md): what is covered and how to run the checks.
+- [Develop and run tests](docs/development.md): local setup, tests, and builds.
+- [Tests](docs/testing.md): what the test suites cover.
 - [Build and size checks](docs/build-and-size-checks.md): generated files and size limits.
 - [Automation and releases](docs/automation-and-releases.md): CI, Pages publishing, and tagged client releases.
+- [Technologies and licenses](docs/technologies-and-licenses.md): direct libraries and their terms.
 
-## Attribution
+## Attribution and licenses
 
-Apps that display index records must include source attribution. See [Attribution](docs/attribution.md) for the required wording and links, and [ATTRIBUTION.md](ATTRIBUTION.md) for distributable notices.
-
-## Contributing
-
-Run the JavaScript and Python tests before opening a pull request. See [Automation and releases](docs/automation-and-releases.md) for CI and publishing details.
-
-## Versioning
-
-Work on a branch and open a pull request into `main`. After it merges, Release Please opens a separate release pull request; merging that PR publishes the release. See the [release guide](docs/automation-and-releases.md#versioned-client-release) for the full steps and manual release option.
-
-## Authors
-
-Geovation and the project contributors. See the [contributor history](https://github.com/Geovation/gb-name-index/graphs/contributors).
-
-## License
-
-The project code is licensed under the [MIT License](docs/license.md). Source data has separate terms; see [Attribution](docs/attribution.md).
+Project code is MIT licensed. Source data has separate terms, and apps that display records must include attribution. See [Attribution](docs/attribution.md) and [ATTRIBUTION.md](ATTRIBUTION.md).
 
 ## Acknowledgments
 
-Thanks to [Ordnance Survey](https://www.ordnancesurvey.co.uk/) for OS Open Names and the [Overture Maps Foundation](https://overturemaps.org/) for Places data. The README structure is inspired by [PurpleBooth's README template](https://github.com/PurpleBooth/a-good-readme-template).
+Thanks to [Ordnance Survey](https://www.ordnancesurvey.co.uk/) for OS Open Names and the [Overture Maps Foundation](https://overturemaps.org/) for Places data. See the [project contributors](https://github.com/Geovation/gb-name-index/graphs/contributors).

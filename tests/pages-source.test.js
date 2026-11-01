@@ -8,8 +8,10 @@ const pages = [
   ['docs/javascript-client.md', 'JavaScript client'],
   ['docs/search-harness.md', 'Search harness'],
   ['docs/testing.md', 'Tests'],
+  ['docs/development.md', 'Develop and run tests'],
   ['docs/build-and-size-checks.md', 'Build and size checks'],
   ['docs/automation-and-releases.md', 'Automation and releases'],
+  ['docs/technologies-and-licenses.md', 'Technologies and licenses'],
   ['docs/attribution.md', 'Attribution'],
   ['docs/license.md', 'License']
 ]
@@ -68,7 +70,15 @@ test('Jekyll source uses GitHub Pages plugins for README and Markdown links', as
   assert.doesNotMatch(`${attributionPage}\n${licensePage}`, /include_relative \.\.\//)
 
   const readme = await readFile('README.md', 'utf8')
-  assert.match(readme, /\[Open the search harness\]\(harness\/\)/)
+  assert.match(readme, /\[search harness\]\(harness\/\)/)
+  assert.match(readme, /search-harness\.png/)
+  assert.match(readme, /\[Develop and run tests\]\(docs\/development\.md\)/)
+  assert.match(readme, /\[Technologies and licenses\]\(docs\/technologies-and-licenses\.md\)/)
+  const harnessImage = await readFile('docs/images/search-harness.png')
+  assert.deepEqual(
+    [...harnessImage.subarray(0, 8)],
+    [137, 80, 78, 71, 13, 10, 26, 10]
+  )
 
   for (const [path, title] of pages) {
     const markdown = await readFile(path, 'utf8')
@@ -110,7 +120,7 @@ test('Catalyst export keeps guides flat and builds a harness against the public 
       .map(path => readFile(`${exportDirectory}/assets/${path}`, 'utf8'))
   )
 
-  assert.equal(pages.length, 9)
+  assert.equal(pages.length, 11)
   assert.deepEqual(directories, ['assets', 'harness'])
   assert.match(index, /has_children: true/)
   assert.match(index, /\[Open the interactive search harness\]\(harness\/\)/)

@@ -9,8 +9,10 @@ const pages = [
   ['docs/javascript-client.md', 'javascript-client', 'JavaScript client'],
   ['docs/search-harness.md', 'search-harness', 'Search harness'],
   ['docs/testing.md', 'testing', 'Tests'],
+  ['docs/development.md', 'development', 'Develop and run tests'],
   ['docs/build-and-size-checks.md', 'build-and-size-checks', 'Build and size checks'],
   ['docs/automation-and-releases.md', 'automation-and-releases', 'Automation and releases'],
+  ['docs/technologies-and-licenses.md', 'technologies-and-licenses', 'Technologies and licenses'],
   ['docs/attribution.md', 'attribution', 'Attribution'],
   ['docs/license.md', 'license', 'License']
 ]
